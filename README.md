@@ -1,377 +1,316 @@
-# ALInvite API 文档
+# ALInvite 邀请系统插件完整使用指南
 
-## 简介
+## 📌 插件简介
 
-ALInvite 是一款 Minecraft 服务器邀请系统插件，支持邀请码绑定、礼包奖励、里程碑奖励、权限组奖励等功能。本文档面向希望与 ALInvite 联动的第三方插件开发者。
+**ALInvite** 是一款功能强大的 Minecraft 服务器邀请系统插件，支持邀请码绑定、新人礼包、累计里程碑奖励、权限组奖励等功能。适用于 Spigot/Paper 1.21+ 服务器。
 
-## 依赖引入
+### 特性
 
-### Maven
+- 🎁 **邀请码系统** - 自动生成唯一邀请码，支持自定义格式
+- 📦 **礼包商店** - 老玩家可购买礼包，提升新人奖励
+- 🏆 **里程碑奖励** - 累计邀请人数达到 milestones 时发放额外奖励
+- 👑 **权限组奖励** - 新人加入权限组时，自动奖励邀请人
+- 🔗 **跨服同步** - 支持多服务器集群数据同步（公告同步已修复）
+- 💰 **经济集成** - 支持 Vault、PlayerPoints 等多种经济插件
+- 🔌 **开放 API** - 提供完整 API，支持第三方插件联动
+
+***
+
+## 📥 安装说明
+
+### 支持的服务端核心
+
+| 核心         | 版本                      | 支持情况           |
+| ---------- | ----------------------- | -------------- |
+| **Paper**  | 1.20.x - 26.x (1.21.11) | ✅ 完全支持         |
+| **Spigot** | 1.20.4 - 1.21.x         | ✅ 完全支持         |
+| **Folia**  | 1.20.4 - 1.21.x         | ✅ 支持 (自动检测调度器) |
+
+> **注意**: 本插件最低要求 Java 21，推荐使用 Paper 或 Folia 服务端以获得最佳性能和兼容性。
+
+### 环境要求
+
+- **服务端**: Spigot / Paper / Folia 1.20.4 - 1.21.x
+- **Java**: JDK 21 或更高版本
+- **依赖插件** (可选):
+  - Vault + 经济插件 (用于金币奖励)
+  - PlayerPoints (用于点券奖励)
+  - PlaceholderAPI (用于变量替换)
+  - LuckPerms (用于实时权限检测)
+
+### 安装步骤
+
+1. 下载 `ALInvite-1.0.5.jar`
+2. 将 jar 文件放入服务器 `plugins` 文件夹
+3. 启动服务器生成默认配置
+4. 根据需求修改 `config.yml` 和 `languages` 文件
+5. 使用 `/alinvite reload` 重载配置
+
+***
+
+## ⚙️ 配置文件说明
+
+### config.yml 主要配置
+
+```yaml
+# ========== 邀请码设置 ==========
+invite_code:
+  length: 6                      # 邀请码长度 (4-8位)
+  charset: "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789"  # 字符集
+  prefix: ""                     # 邀请码前缀 (如 "AL-" 生成 "AL-ABC123")
+  veteran_permission: "alinvite.veteran"   # 老玩家权限节点
+  use_permission: "alinvite.use"          # 新玩家使用邀请码权限
+  allow_veteran_to_bind: false   # 是否允许老玩家绑定老玩家
+
+# ========== IP 限制 ==========
+ip_restriction:
+  enabled: false
+  max_invites_per_ip: 1          # 同 IP 最多绑定次数
+  prevent_self_ip: false         # 禁止同 IP 互相邀请
+
+# ========== 里程碑奖励 ==========
+milestones:
+  1:
+    name: "社交新星"
+    rewards:
+      - type: "money"
+        value: 100
+      - type: "points"
+        value: 10
+  5:
+    name: "社交达人"
+    rewards:
+      - type: "money"
+        value: 500
+      - type: "points"
+        value: 50
+  10:
+    name: "社交传奇"
+    rewards:
+      - type: "money"
+        value: 1000
+      - type: "points"
+        value: 100
+
+# ========== 权限组奖励 ==========
+permission_group_rewards:
+  enabled: true
+  permission_prefix: "alinvite"  # 权限前缀
+  check_interval: 10              # 检测间隔 (秒)
+  rewards:
+    "lv2":
+      money: 100
+      points: 0
+      weight: 2
+    "lv3":
+      money: 200
+      points: 0
+      weight: 3
+    "lv5":
+      money: 1000
+      points: 100
+      weight: 5
+
+# ========== 数据库设置 ==========
+database:
+  type: "sqlite"                 # sqlite 或 mysql
+  server_id: "default"           # 服务器标识 (集群需不同ID)
+```
+
+***
+
+## 📋 命令说明
+
+### 玩家命令
+
+| 命令               | 说明       | 权限             |
+| ---------------- | -------- | -------------- |
+| `/alinvite`      | 打开主菜单    | `alinvite.use` |
+| `/alinvite code` | 查看自己的邀请码 | `alinvite.use` |
+
+### 管理员命令
+
+| 命令                               | 说明      | 权限               |
+| -------------------------------- | ------- | ---------------- |
+| `/alinvite admin reload`         | 重载配置文件  | `alinvite.admin` |
+| `/alinvite admin stats [玩家]`     | 查看邀请统计  | `alinvite.admin` |
+| `/alinvite admin clearcode <玩家>` | 清除玩家邀请码 | `alinvite.admin` |
+
+***
+
+## 🔑 权限说明
+
+### 玩家权限
+
+| 权限节点               | 说明      | 默认  |
+| ------------------ | ------- | --- |
+| `alinvite.use`     | 使用邀请码功能 | 所有人 |
+| `alinvite.veteran` | 拥有邀请码资格 | OP  |
+
+### 管理员权限
+
+| 权限节点             | 说明    | 默认 |
+| ---------------- | ----- | -- |
+| `alinvite.admin` | 管理员命令 | OP |
+
+### 权限组奖励权限
+
+| 权限节点           | 触发奖励      |
+| -------------- | --------- |
+| `alinvite.lv2` | 触发 lv2 奖励 |
+| `alinvite.lv3` | 触发 lv3 奖励 |
+| `alinvite.lv4` | 触发 lv4 奖励 |
+| `alinvite.lv5` | 触发 lv5 奖励 |
+| `alinvite.lv6` | 触发 lv6 奖励 |
+
+***
+
+## 🎮 使用教程
+
+### 1. 基础设置
+
+1. 配置 `veteran_permission` 决定谁可以成为"老玩家"（拥有邀请码）
+2. 配置 `use_permission` 决定谁可以使用邀请码绑定
+3. 在权限插件中给老玩家添加 `alinvite.veteran` 权限
+
+### 2. 邀请流程
+
+```
+老玩家 (有 alinvite.veteran)
+    ↓ 打开菜单点击"邀请中心"
+    ↓ 查看自己的邀请码 (如 ABC123)
+    ↓ 分享给新玩家
+
+新玩家 (有 alinvite.use)
+    ↓ 打开菜单点击"填写邀请码"
+    ↓ 输入老玩家的邀请码 ABC123
+    ↓ 绑定成功，新玩家获得礼包奖励
+```
+
+### 3. 礼包商店
+
+老玩家可以在礼包商店购买礼包：
+
+| 礼包   | 价格             | 新人奖励              |
+| ---- | -------------- | ----------------- |
+| 基础礼包 | 免费             | 50金币 + 64熟牛肉      |
+| 普通礼包 | 500金币 / 50点券   | 50金币 + 5点券 + 物品   |
+| 高级礼包 | 2000金币 / 200点券 | 300金币 + 30点券 + 钻石 |
+
+### 4. 里程碑奖励
+
+当老玩家累计邀请达到指定人数时，自动获得里程碑奖励：
+
+| 里程碑 | 名称   | 奖励示例           |
+| --- | ---- | -------------- |
+| 1人  | 社交新星 | 100金币 + 10点券   |
+| 5人  | 社交达人 | 500金币 + 50点券   |
+| 10人 | 社交传奇 | 1000金币 + 100点券 |
+
+### 5. 权限组奖励
+
+当新人加入指定权限组时，奖励邀请他的老玩家：
+
+```
+配置示例:
+permission_group_rewards:
+  rewards:
+    "lv2":    # 新人需要 alinvite.lv2 权限
+      money: 100
+      points: 0
+    "vip":    # 新人需要 alinvite.vip 权限
+      money: 500
+      points: 50
+```
+
+**触发条件**: 新人获得 `alinvite.lv2` 权限 → 老玩家获得对应金币奖励
+
+**实时检测**: 配合 LuckPerms 可实现权限变化时实时奖励
+
+***
+
+## 🔌 API 文档
+
+### Maven 依赖
 
 ```xml
 <dependency>
     <groupId>com.alinvite</groupId>
     <artifactId>ALInvite</artifactId>
-    <version>1.0.5</version>
+    <version>1.0.1</version>
     <scope>provided</scope>
 </dependency>
 ```
 
-### Gradle (Kotlin DSL)
-
-```kotlin
-compileOnly("com.alinvite:ALInvite:1.0.5")
-```
-
-## 前置要求
-
-你的插件需要在 `plugin.yml` 中声明对 ALInvite 的软依赖：
-
-```yaml
-name: YourPlugin
-version: 1.0.0
-main: com.example.YourPlugin
-softdepend:
-  - ALInvite
-```
-
-## 初始化
-
-在你的插件启动时获取 ALInvite API 实例：
+### 初始化
 
 ```java
 import com.alinvite.ALInvite;
 import com.alinvite.api.ALInviteAPI;
-import org.bukkit.plugin.java.JavaPlugin;
 
-public class YourPlugin extends JavaPlugin {
-
-    @Override
-    public void onEnable() {
-        // 等待 ALInvite 完全加载
-        getServer().getScheduler().runTaskLater(this, () -> {
-            ALInvite alInvite = (ALInvite) getServer().getPluginManager().getPlugin("ALInvite");
-            if (alInvite != null) {
-                ALInviteAPI.init(alInvite);
-                getLogger().info("ALInvite API 初始化成功");
-            }
-        }, 1L);
-    }
-}
-```
-
-***
-
-## API 参考
-
-所有方法都是**异步**的，返回 `CompletableFuture`，请勿在主线程调用。
-
-***
-
-### 1. 邀请码相关
-
-#### 获取玩家邀请码
-
-```java
-// 通过 Player 对象获取
-CompletableFuture<String> code = ALInviteAPI.getInviteCode(Player player);
-
-// 通过 UUID 获取
-CompletableFuture<String> code = ALInviteAPI.getInviteCode(UUID uuid);
-```
-
-**返回值说明：**
-
-- 如果玩家有邀请码，返回格式如 `"ABC123"`（不含前缀）或 `"AL-ABC123"`（含前缀）
-- 如果玩家没有邀请码或不具备老玩家权限，返回 `null`
-
-**权限要求：**
-
-- 玩家需要拥有 `alinvite.veteran` 权限（或配置中的自定义权限）才能获得邀请码
-
-**示例：**
-
-```java
-ALInviteAPI.getInviteCode(player).thenAccept(code -> {
-    if (code != null) {
-        player.sendMessage("你的邀请码是: " + code);
-    } else {
-        player.sendMessage("你还没有邀请码");
-    }
-});
-```
-
-***
-
-#### 获取玩家邀请人数
-
-```java
-// 通过 Player 对象获取
-CompletableFuture<Integer> total = ALInviteAPI.getTotalInvites(Player player);
-
-// 通过 UUID 获取
-CompletableFuture<Integer> total = ALInviteAPI.getTotalInvites(UUID uuid);
-```
-
-**返回值说明：**
-
-- 返回该玩家成功邀请的玩家数量（已绑定且完成注册）
-
-***
-
-### 2. 绑定状态相关
-
-#### 检查玩家是否已绑定邀请人
-
-```java
-CompletableFuture<Boolean> bound = ALInviteAPI.isPlayerBound(Player player);
-CompletableFuture<Boolean> bound = ALInviteAPI.isPlayerBound(UUID uuid);
-```
-
-**返回值说明：**
-
-- `true` - 玩家已绑定邀请人
-- `false` - 玩家未绑定（是新玩家）
-
-***
-
-#### 获取绑定状态文字
-
-```java
-CompletableFuture<String> status = ALInviteAPI.getBindStatus(Player player);
-CompletableFuture<String> status = ALInviteAPI.getBindStatus(UUID uuid);
-```
-
-**返回值说明：**
-
-- `"已绑定"` - 玩家已绑定邀请人
-- `"未绑定"` - 玩家未绑定
-
-***
-
-#### 获取邀请人名称
-
-```java
-CompletableFuture<String> name = ALInviteAPI.getInviterName(Player player);
-CompletableFuture<String> name = ALInviteAPI.getInviterName(UUID uuid);
-```
-
-**返回值说明：**
-
-- 如果有邀请人且在线，返回邀请人当前游戏名
-- 如果有邀请人但离线，返回数据库中保存的邀请码
-- 如果没有邀请人，返回 `"无"`
-
-***
-
-#### 获取邀请人 UUID
-
-```java
-CompletableFuture<UUID> inviter = ALInviteAPI.getInviterUuid(Player player);
-CompletableFuture<UUID> inviter = ALInviteAPI.getInviterUuid(UUID uuid);
-```
-
-**返回值说明：**
-
-- 如果有邀请人，返回邀请人 UUID
-- 如果没有邀请人，返回 `null`
-
-***
-
-#### 获取被邀请的玩家列表
-
-```java
-CompletableFuture<List<UUID>> invitees = ALInviteAPI.getInvitees(UUID inviterUuid);
-```
-
-**返回值说明：**
-
-- 返回指定邀请人邀请过的所有玩家 UUID 列表
-
-***
-
-### 3. 礼包相关
-
-#### 获取玩家已购买的礼包 ID
-
-```java
-CompletableFuture<String> giftId = ALInviteAPI.getPurchasedGift(Player player);
-CompletableFuture<String> giftId = ALInviteAPI.getPurchasedGift(UUID uuid);
-```
-
-**返回值说明：**
-
-- 返回礼包配置中的 ID，如 `"basic_gift"`、`"premium_gift"`
-- 如果玩家未购买任何礼包，返回 `null`
-
-***
-
-#### 获取玩家当前使用的礼包配置
-
-```java
-CompletableFuture<GiftConfig> gift = ALInviteAPI.getActiveGift(Player player);
-CompletableFuture<GiftConfig> gift = ALInviteAPI.getActiveGift(UUID uuid);
-```
-
-**返回值说明：**
-
-- 返回玩家当前使用的礼包完整配置
-- 如果玩家未购买且 `require_gift: false`，返回默认礼包
-- 如果玩家未购买且 `require_gift: true`，返回 `null`
-
-**GiftConfig 结构：**
-
-```java
-public class GiftConfig {
-    public String name;                        // 礼包显示名称
-    public String material;                    // 物品材质
-    public int customModelData;                // 自定义模型数据
-    public double priceMoney;                  // 金币价格
-    public int pricePoints;                    // 点券价格
-    public List<RewardItem> rewards;           // 奖励列表
-}
-
-public class RewardItem {
-    public String type;   // 奖励类型: "command", "money", "points", "item"
-    public String value;  // 奖励值（命令/数量/物品ID）
-}
-```
-
-***
-
-### 4. 工具方法
-
-#### 检查两玩家是否同 IP
-
-```java
-CompletableFuture<Boolean> sameIp = ALInviteAPI.isSameIp(Player p1, Player p2);
-```
-
-**返回值说明：**
-
-- `true` - 两玩家 IP 地址相同
-- `false` - IP 不同或任一玩家为 null
-
-***
-
-#### 解析 PlaceholderAPI 变量
-
-```java
-CompletableFuture<String> resolved = ALInviteAPI.resolvePlaceholders(String text, Player player);
-```
-
-**支持的变量：**
-
-- `{player}` - 玩家名称
-- `{invite_code}` - 玩家邀请码
-- `{total_invites}` - 邀请人数
-- 其他 PlaceholderAPI 变量
-
-**示例：**
-
-```java
-ALInviteAPI.resolvePlaceholders("恭喜 {player} 获得邀请码: {invite_code}", player)
-    .thenAccept(message -> {
-        Bukkit.broadcastMessage(message);
-    });
-```
-
-***
-
-### 5. 事件监听
-
-#### 监听邀请成功事件
-
-```java
-ALInviteAPI.registerInviteListener((inviterUuid, inviteeUuid) -> {
-    // 邀请人 UUID
-    // 被邀请人 UUID
-    getLogger().info("玩家 " + inviterUuid + " 成功邀请了 " + inviteeUuid);
-});
-```
-
-**触发时机：**
-
-- 当新玩家成功绑定邀请码并完成注册时触发
-
-***
-
-## 完整示例
-
-### 检查玩家邀请码并广播
-
-```java
-public void announceInviteCode(Player player) {
-    ALInviteAPI.getInviteCode(player).thenAccept(code -> {
-        if (code != null) {
-            Bukkit.broadcastMessage(player.getName() + " 的邀请码是 " + code + "，快去使用吧！");
-        } else {
-            player.sendMessage("你还没有邀请码");
-        }
-    });
-}
-```
-
-### 给予达到邀请里程碑的玩家特殊称号
-
-```java
-public void checkAndGrantTitle(Player player) {
-    ALInviteAPI.getTotalInvites(player).thenAccept(total -> {
-        if (total >= 10) {
-            // 给邀请了10人的玩家添加称号
-            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "lp user " + player.getName() + " permission set special.inviter true");
-        }
-    });
-}
-```
-
-### 第三方插件检测老玩家
-
-```java
-public boolean isVeteranPlayer(Player player) {
-    return ALInviteAPI.getInviteCode(player).thenApply(code -> code != null).join();
-}
-```
-
-***
-
-## 常见问题
-
-### Q: API 调用是同步还是异步？
-
-所有 API 方法都是**异步**的，返回 `CompletableFuture`。建议在异步线程中处理业务逻辑，如果需要同步等待，可以使用 `.join()` 方法：
-
-```java
-// 异步获取
-ALInviteAPI.getInviteCode(player).thenAccept(code -> {
-    // 在异步线程中处理
-});
-
-// 同步等待（谨慎使用，可能阻塞主线程）
-String code = ALInviteAPI.getInviteCode(player).join();
-```
-
-### Q: 如何检查 ALInvite 是否安装？
-
-```java
 ALInvite plugin = (ALInvite) getServer().getPluginManager().getPlugin("ALInvite");
 if (plugin != null) {
-    // ALInvite 已安装
     ALInviteAPI.init(plugin);
 }
 ```
 
-### Q: 获取的邀请码为 null 是什么原因？
+### API 方法
 
-可能原因：
+```java
+// 获取邀请码
+CompletableFuture<String> code = ALInviteAPI.getInviteCode(Player player);
 
-1. 玩家没有 `alinvite.veteran` 权限
-2. 玩家确实没有生成过邀请码
-3. 数据库中该玩家没有邀请码记录
+// 获取邀请人数
+CompletableFuture<Integer> total = ALInviteAPI.getTotalInvites(Player player);
 
-### Q: 如何联系开发者？
+// 检查绑定状态
+CompletableFuture<Boolean> bound = ALInviteAPI.isPlayerBound(Player player);
 
-如有问题或建议，请通过以下方式联系：
+// 获取邀请人名称
+CompletableFuture<String> inviterName = ALInviteAPI.getInviterName(Player player);
 
-- GitHub Issues: [AllenLinong/ALInvite： 邀请插件](https://github.com/AllenLinong/ALInvite)
-- QQ:1422163791
+// 获取邀请人 UUID
+CompletableFuture<UUID> inviter = ALInviteAPI.getInviterUuid(Player player);
+
+// 获取当前礼包配置
+CompletableFuture<GiftConfig> gift = ALInviteAPI.getActiveGift(Player player);
+
+// 监听邀请成功事件
+ALInviteAPI.registerInviteListener((inviterUuid, inviteeUuid) -> {
+    // 处理邀请成功逻辑
+});
+```
+
+***
+
+## ❓ 常见问题
+
+### Q: 玩家没有邀请码？
+
+检查玩家是否拥有 `alinvite.veteran` 权限，或者是否在配置中修改了权限节点。
+
+### Q: 新人无法输入邀请码？
+
+检查新人是否拥有 `alinvite.use` 权限。
+
+### Q: 金币/点券没有发放？
+
+1. 检查是否安装了经济插件 (Vault/PlayerPoints)
+2. 检查 config.yml 中的经济配置是否正确
+3. 查看服务器日志是否有错误信息
+
+### Q: 权限组奖励没有触发？
+
+1. 确认 `permission_group_rewards.enabled: true`
+2. 确认新人拥有对应的 `alinvite.xxx` 权限
+3. 如果不是 LuckPerms，最多可能有 10 秒延迟
+
+### Q: 跨服公告重复？
+
+确认每个服务器的 `database.server_id` 配置不同。
+
+***
+
+## 📄 许可证
+
+本插件遵循 MIT 许可证开源。

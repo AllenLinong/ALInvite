@@ -60,13 +60,13 @@ public class YourPlugin extends JavaPlugin {
 }
 ```
 
----
+***
 
 ## API 参考
 
 所有方法都是**异步**的，返回 `CompletableFuture`，请勿在主线程调用。
 
----
+***
 
 ### 1. 邀请码相关
 
@@ -81,10 +81,12 @@ CompletableFuture<String> code = ALInviteAPI.getInviteCode(UUID uuid);
 ```
 
 **返回值说明：**
+
 - 如果玩家有邀请码，返回格式如 `"ABC123"`（不含前缀）或 `"AL-ABC123"`（含前缀）
 - 如果玩家没有邀请码或不具备老玩家权限，返回 `null`
 
 **权限要求：**
+
 - 玩家需要拥有 `alinvite.veteran` 权限（或配置中的自定义权限）才能获得邀请码
 
 **示例：**
@@ -99,7 +101,7 @@ ALInviteAPI.getInviteCode(player).thenAccept(code -> {
 });
 ```
 
----
+***
 
 #### 获取玩家邀请人数
 
@@ -112,9 +114,10 @@ CompletableFuture<Integer> total = ALInviteAPI.getTotalInvites(UUID uuid);
 ```
 
 **返回值说明：**
+
 - 返回该玩家成功邀请的玩家数量（已绑定且完成注册）
 
----
+***
 
 ### 2. 绑定状态相关
 
@@ -126,10 +129,11 @@ CompletableFuture<Boolean> bound = ALInviteAPI.isPlayerBound(UUID uuid);
 ```
 
 **返回值说明：**
+
 - `true` - 玩家已绑定邀请人
 - `false` - 玩家未绑定（是新玩家）
 
----
+***
 
 #### 获取绑定状态文字
 
@@ -139,10 +143,11 @@ CompletableFuture<String> status = ALInviteAPI.getBindStatus(UUID uuid);
 ```
 
 **返回值说明：**
+
 - `"已绑定"` - 玩家已绑定邀请人
 - `"未绑定"` - 玩家未绑定
 
----
+***
 
 #### 获取邀请人名称
 
@@ -152,11 +157,12 @@ CompletableFuture<String> name = ALInviteAPI.getInviterName(UUID uuid);
 ```
 
 **返回值说明：**
+
 - 如果有邀请人且在线，返回邀请人当前游戏名
 - 如果有邀请人但离线，返回数据库中保存的邀请码
 - 如果没有邀请人，返回 `"无"`
 
----
+***
 
 #### 获取邀请人 UUID
 
@@ -166,10 +172,11 @@ CompletableFuture<UUID> inviter = ALInviteAPI.getInviterUuid(UUID uuid);
 ```
 
 **返回值说明：**
+
 - 如果有邀请人，返回邀请人 UUID
 - 如果没有邀请人，返回 `null`
 
----
+***
 
 #### 获取被邀请的玩家列表
 
@@ -178,9 +185,10 @@ CompletableFuture<List<UUID>> invitees = ALInviteAPI.getInvitees(UUID inviterUui
 ```
 
 **返回值说明：**
+
 - 返回指定邀请人邀请过的所有玩家 UUID 列表
 
----
+***
 
 ### 3. 礼包相关
 
@@ -192,10 +200,11 @@ CompletableFuture<String> giftId = ALInviteAPI.getPurchasedGift(UUID uuid);
 ```
 
 **返回值说明：**
+
 - 返回礼包配置中的 ID，如 `"basic_gift"`、`"premium_gift"`
 - 如果玩家未购买任何礼包，返回 `null`
 
----
+***
 
 #### 获取玩家当前使用的礼包配置
 
@@ -205,6 +214,7 @@ CompletableFuture<GiftConfig> gift = ALInviteAPI.getActiveGift(UUID uuid);
 ```
 
 **返回值说明：**
+
 - 返回玩家当前使用的礼包完整配置
 - 如果玩家未购买且 `require_gift: false`，返回默认礼包
 - 如果玩家未购买且 `require_gift: true`，返回 `null`
@@ -227,7 +237,7 @@ public class RewardItem {
 }
 ```
 
----
+***
 
 ### 4. 工具方法
 
@@ -238,10 +248,11 @@ CompletableFuture<Boolean> sameIp = ALInviteAPI.isSameIp(Player p1, Player p2);
 ```
 
 **返回值说明：**
+
 - `true` - 两玩家 IP 地址相同
 - `false` - IP 不同或任一玩家为 null
 
----
+***
 
 #### 解析 PlaceholderAPI 变量
 
@@ -250,6 +261,7 @@ CompletableFuture<String> resolved = ALInviteAPI.resolvePlaceholders(String text
 ```
 
 **支持的变量：**
+
 - `{player}` - 玩家名称
 - `{invite_code}` - 玩家邀请码
 - `{total_invites}` - 邀请人数
@@ -264,7 +276,7 @@ ALInviteAPI.resolvePlaceholders("恭喜 {player} 获得邀请码: {invite_code}"
     });
 ```
 
----
+***
 
 ### 5. 事件监听
 
@@ -279,9 +291,10 @@ ALInviteAPI.registerInviteListener((inviterUuid, inviteeUuid) -> {
 ```
 
 **触发时机：**
+
 - 当新玩家成功绑定邀请码并完成注册时触发
 
----
+***
 
 ## 完整示例
 
@@ -320,7 +333,7 @@ public boolean isVeteranPlayer(Player player) {
 }
 ```
 
----
+***
 
 ## 常见问题
 
@@ -351,6 +364,7 @@ if (plugin != null) {
 ### Q: 获取的邀请码为 null 是什么原因？
 
 可能原因：
+
 1. 玩家没有 `alinvite.veteran` 权限
 2. 玩家确实没有生成过邀请码
 3. 数据库中该玩家没有邀请码记录
@@ -358,14 +372,10 @@ if (plugin != null) {
 ### Q: 如何联系开发者？
 
 如有问题或建议，请通过以下方式联系：
-- GitHub Issues: `https://github.com/your-repo/ALInvite/issues`
-- Discord: `your-discord-link`
 
----
+- GitHub Issues: [AllenLinong/ALInvite： 邀请插件](https://github.com/AllenLinong/ALInvite)
+- QQ:1422163791
 
-## 更新日志
+***
 
-### v1.0.0
-- 初始 API 发布
-- 支持邀请码、绑定状态、礼包查询
-- 支持事件监听
+##

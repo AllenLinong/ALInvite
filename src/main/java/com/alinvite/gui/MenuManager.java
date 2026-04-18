@@ -1,0 +1,821 @@
+package com.alinvite.gui;
+
+import com.alinvite.ALInvite;
+import com.alinvite.config.ConfigManager;
+import com.alinvite.manager.GiftManager;
+import com.alinvite.manager.MilestoneManager;
+import com.alinvite.utils.PlaceholderResolver;
+import com.alinvite.utils.SchedulerUtils;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemFlag;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+
+import java.util.*;
+
+public class MenuManager {
+
+    private final ALInvite plugin;
+    private final Map<String, MenuConfig> menus;
+    private final PlaceholderResolver placeholderResolver;
+
+    public MenuManager(ALInvite plugin) {
+        this.plugin = plugin;
+        this.menus = new HashMap<>();
+        this.placeholderResolver = new PlaceholderResolver(plugin);
+        loadMenus();
+    }
+
+    public PlaceholderResolver getPlaceholderResolver() {
+        return placeholderResolver;
+    }
+
+    private void loadMenus() {
+        var menusSection = plugin.getConfigManager().getMenusConfig().getConfigurationSection("main_menu");
+        if (menusSection != null) {
+            menus.put("main_menu", loadMenuConfig("main_menu"));
+        }
+
+        menusSection = plugin.getConfigManager().getMenusConfig().getConfigurationSection("veteran_menu");
+        if (menusSection != null) {
+            menus.put("veteran_menu", loadMenuConfig("veteran_menu"));
+        }
+
+        menusSection = plugin.getConfigManager().getMenusConfig().getConfigurationSection("shop_menu");
+        if (menusSection != null) {
+            menus.put("shop_menu", loadMenuConfig("shop_menu"));
+        }
+    }
+
+    private MenuConfig loadMenuConfig(String menuName) {
+        MenuConfig config = new MenuConfig();
+        config.title = plugin.getConfigManager().getMenusConfig().getString(menuName + ".title", "菜单");
+        config.shape = plugin.getConfigManager().getMenusConfig().getStringList(menuName + ".shape");
+        config.buttons = new HashMap<>();
+
+        var buttonsSection = plugin.getConfigManager().getMenusConfig().getConfigurationSection(menuName + ".buttons");
+        if (buttonsSection != null) {
+            for (String key : buttonsSection.getKeys(false)) {
+                if (key.equals("background")) continue;
+                ButtonConfig btn = new ButtonConfig();
+                btn.material = plugin.getConfigManager().getMenusConfig().getString(menuName + ".buttons." + key + ".material", "STONE");
+                btn.name = plugin.getConfigManager().getMenusConfig().getString(menuName + ".buttons." + key + ".name", "");
+                btn.lore = plugin.getConfigManager().getMenusConfig().getStringList(menuName + ".buttons." + key + ".lore");
+                btn.action = plugin.getConfigManager().getMenusConfig().getString(menuName + ".buttons." + key + ".action", "NONE");
+                btn.isDynamic = plugin.getConfigManager().getMenusConfig().getBoolean(menuName + ".buttons." + key + ".dynamic", false);
+                btn.customModelData = plugin.getConfigManager().getMenusConfig().getInt(menuName + ".buttons." + key + ".custom-model-data", 0);
+
+                var stateOverrides = plugin.getConfigManager().getMenusConfig().getConfigurationSection(menuName + ".buttons." + key + ".state_overrides");
+                if (stateOverrides != null) {
+                    btn.stateOverrides = new HashMap<>();
+                    for (String state : stateOverrides.getKeys(false)) {
+                        ButtonConfig stateBtn = new ButtonConfig();
+                        stateBtn.material = plugin.getConfigManager().getMenusConfig().getString(menuName + ".buttons." + key + ".state_overrides." + state + ".material", "STONE");
+                        stateBtn.name = plugin.getConfigManager().getMenusConfig().getString(menuName + ".buttons." + key + ".state_overrides." + state + ".name", "");
+                        stateBtn.lore = plugin.getConfigManager().getMenusConfig().getStringList(menuName + ".buttons." + key + ".state_overrides." + state + ".lore");
+                        stateBtn.action = plugin.getConfigManager().getMenusConfig().getString(menuName + ".buttons." + key + ".state_overrides." + state + ".action", "NONE");
+                        stateBtn.customModelData = plugin.getConfigManager().getMenusConfig().getInt(menuName + ".buttons." + key + ".state_overrides." + state + ".custom-model-data", 0);
+                        btn.stateOverrides.put(state, stateBtn);
+                    }
+                }
+
+                config.buttons.put(key, btn);
+            }
+        }
+
+        config.backgroundMaterial = plugin.getConfigManager().getMenusConfig().getString("background.material", "BLACK_STAINED_GLASS_PANE");
+        config.backgroundName = plugin.getConfigManager().getMenusConfig().getString("background.name", " ");
+        config.backgroundLore = new ArrayList<>();
+
+        return config;
+    }
+
+    public void openMainMenu(Player player) {
+        openMenu(player, "main_menu", "main");
+    }
+
+    public void openVeteranMenu(Player player) {
+        openMenu(player, "veteran_menu", "veteran");
+    }
+
+    public void openShopMenu(Player player) {
+        openMenu(player, "shop_menu", "shop");
+    }
+
+    private void openMenu(Player player, String menuName, String menuKey) {
+        MenuConfig config = menus.get(menuName);
+        if (config == null) {
+            player.sendMessage("菜单配置不存在");
+            return;
+        }
+
+        // 确保菜单会话正确创建
+        Map<Integer, String> slotActions = buildSlotActions(config);
+        Inventory inventory = Bukkit.createInventory(new MenuHolder(config.title), config.shape.size() * 9, ConfigManager.colorize(config.title));
+        
+        // 创建或更新菜单会话
+        MenuSessionManager.getInstance().createSession(player, menuKey, new MenuSession(player, menuKey, config, slotActions));
+
+        switch (menuKey) {
+            case "main" -> createMainMenuInventoryAsync(player, inventory, config, slotActions);
+            case "veteran" -> createVeteranInventory(player, config, inventory, slotActions);
+            case "shop" -> createShopInventory(player, config, inventory, slotActions);
+        }
+    }
+
+    private void createMainMenuInventoryAsync(Player player, Inventory inventory, MenuConfig config, Map<Integer, String> slotActions) {
+        String veteranPerm = plugin.getConfigManager().getConfig()
+            .getString("invite_code.veteran_permission", "alinvite.veteran");
+        boolean hasPermission = player.hasPermission(veteranPerm);
+
+        plugin.getDatabaseManager().getPlayerData(player.getUniqueId()).thenAccept(data -> {
+            final String existingCode = data != null ? data.inviteCode : null;
+
+            if (hasPermission && existingCode == null) {
+                plugin.getInviteManager().generateInviteCode(player.getUniqueId()).thenAccept(newCode -> {
+                    showMainMenuWithData(player, inventory, config, slotActions, hasPermission, newCode);
+                });
+            } else {
+                showMainMenuWithData(player, inventory, config, slotActions, hasPermission, existingCode);
+            }
+        });
+    }
+
+    private void showMainMenuWithData(Player player, Inventory inventory, MenuConfig config, Map<Integer, String> slotActions, boolean hasPermission, String inviteCode) {
+        final String codeStatus = hasPermission ? (inviteCode != null ? inviteCode : "生成中...") : "未解锁";
+
+        plugin.getDatabaseManager().getInviter(player.getUniqueId()).thenAccept(inviterUuid -> {
+            String bindStatus = "未绑定";
+            String inviterName = "未绑定";
+            if (inviterUuid != null) {
+                plugin.getDatabaseManager().getPlayerData(inviterUuid).thenAccept(inviterData -> {
+                    String finalInviterName;
+                    String finalBindStatus;
+                    if (inviterData != null) {
+                        Player onlineInviter = plugin.getServer().getPlayer(inviterUuid);
+                        finalInviterName = onlineInviter != null && onlineInviter.isOnline() ? onlineInviter.getName() : inviterData.inviteCode;
+                        finalBindStatus = "已绑定";
+                    } else {
+                        finalInviterName = "未绑定";
+                        finalBindStatus = "未绑定";
+                    }
+                    fillMainMenuInventory(player, inventory, config, slotActions, finalBindStatus, finalInviterName, codeStatus);
+                });
+            } else {
+                fillMainMenuInventory(player, inventory, config, slotActions, bindStatus, inviterName, codeStatus);
+            }
+        });
+    }
+
+    private void fillMainMenuInventory(Player player, Inventory inventory, MenuConfig config, Map<Integer, String> slotActions, String bindStatus, String inviterName, String inviteCode) {
+        int slot = 0;
+        for (String row : config.shape) {
+            for (char c : row.toCharArray()) {
+                if (c == '#') {
+                    inventory.setItem(slot, createBackgroundItem(config));
+                } else {
+                    ButtonConfig btn = config.buttons.get(String.valueOf(c));
+                    if (btn != null) {
+                        inventory.setItem(slot, createMainButtonItem(btn, bindStatus, inviterName, inviteCode));
+                    }
+                }
+                slot++;
+            }
+        }
+        SchedulerUtils.runTask(plugin, () -> {
+            player.openInventory(inventory);
+        });
+    }
+
+    private ItemStack createMainButtonItem(ButtonConfig btn, String bindStatus, String inviterName, String inviteCode) {
+        String displayCode = inviteCode != null ? inviteCode : "无";
+        ItemStack item = new ItemStack(Material.valueOf(btn.material));
+        ItemMeta meta = item.getItemMeta();
+        String name = ConfigManager.colorize(btn.name)
+                .replace("{bind_status}", bindStatus)
+                .replace("{inviter_name}", inviterName)
+                .replace("{invite_code}", displayCode);
+        meta.setDisplayName(name);
+        List<String> lore = btn.lore.stream()
+                .map(s -> ConfigManager.colorize(s)
+                        .replace("{bind_status}", bindStatus)
+                        .replace("{inviter_name}", inviterName)
+                        .replace("{invite_code}", displayCode))
+                .toList();
+        meta.setLore(lore);
+        if (btn.customModelData > 0) {
+            meta.setCustomModelData(btn.customModelData);
+        }
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private Inventory createInventory(Player player, MenuConfig config) {
+        int size = config.shape.size() * 9;
+        String title = ConfigManager.colorize(config.title);
+        Inventory inventory = Bukkit.createInventory(new MenuHolder(config.title), size, title);
+
+        int slot = 0;
+        for (String row : config.shape) {
+            for (char c : row.toCharArray()) {
+                if (c == '#') {
+                    inventory.setItem(slot, createBackgroundItem(config));
+                } else {
+                    ButtonConfig btn = config.buttons.get(String.valueOf(c));
+                    if (btn != null) {
+                        inventory.setItem(slot, createButtonItem(player, btn));
+                    }
+                }
+                slot++;
+            }
+        }
+
+        return inventory;
+    }
+
+    private Map<Integer, String> buildSlotActions(MenuConfig config) {
+        Map<Integer, String> slotActions = new HashMap<>();
+        int slot = 0;
+        for (String row : config.shape) {
+            for (char c : row.toCharArray()) {
+                if (c != '#') {
+                    ButtonConfig btn = config.buttons.get(String.valueOf(c));
+                    if (btn != null) {
+                        slotActions.put(slot, btn.action);
+                    }
+                }
+                slot++;
+            }
+        }
+        return slotActions;
+    }
+
+    private void createVeteranInventory(Player player, MenuConfig config, Inventory inventory, Map<Integer, String> slotActions) {
+        plugin.getDatabaseManager().getClaimedMilestones(player.getUniqueId()).thenAccept(claimedJson -> {
+            Set<String> claimed = parseJsonArray(claimedJson);
+            plugin.getDatabaseManager().getPlayerData(player.getUniqueId()).thenAccept(data -> {
+                plugin.getDatabaseManager().getGiftId(player.getUniqueId()).thenAccept(currentGiftId -> {
+                    int total = data != null ? data.totalInvites : 0;
+                    String inviteCode = data != null ? data.inviteCode : null;
+                    Map<Integer, MilestoneManager.Milestone> milestones = plugin.getMilestoneManager().getMilestones();
+
+                    String defaultGiftId = plugin.getConfigManager().getConfig()
+                        .getString("new_player_reward.default_gift_id", "default");
+                    String finalGiftId = currentGiftId != null ? currentGiftId : defaultGiftId;
+                    GiftManager.GiftConfig currentGift = plugin.getGiftManager().getGift(finalGiftId);
+
+                    int milestoneSlot = 10;
+                    for (Map.Entry<Integer, MilestoneManager.Milestone> entry : milestones.entrySet()) {
+                        int required = entry.getKey();
+                        MilestoneManager.Milestone milestone = entry.getValue();
+
+                        String state;
+                        if (claimed.contains(String.valueOf(required))) {
+                            state = "claimed";
+                        } else if (total >= required) {
+                            state = "available";
+                        } else {
+                            state = "locked";
+                        }
+
+                        ButtonConfig btn = config.buttons.get("M");
+                        ButtonConfig stateBtn = btn != null && btn.stateOverrides != null ?
+                            btn.stateOverrides.get(state) : null;
+
+                        String materialStr = stateBtn != null ? stateBtn.material : btn.material;
+                        String name = stateBtn != null && stateBtn.name != null ? stateBtn.name : btn.name;
+                        List<String> lore = stateBtn != null && stateBtn.lore != null ? stateBtn.lore : btn.lore;
+
+                        name = placeholderResolver.applyPlaceholders(name, player);
+                        name = name.replace("{milestone_name}", milestone.name);
+
+                        List<String> milestoneRewardLore = formatMilestoneRewardsLore(milestone);
+                        final int finalTotal = total;
+                        List<String> finalLore = new ArrayList<>();
+                        for (String loreLine : lore) {
+                            String processed = placeholderResolver.applyPlaceholders(loreLine, player);
+                            processed = processed.replace("{milestone_name}", milestone.name)
+                                .replace("{current}", String.valueOf(finalTotal))
+                                .replace("{required}", String.valueOf(required))
+                                .replace("{remaining}", String.valueOf(Math.max(0, required - finalTotal)))
+                                .replace("{status}", state)
+                                .replace("{status_text}", getStatusText(state));
+
+                            if (processed.contains("{reward_lore}")) {
+                                for (String rewardLine : milestoneRewardLore) {
+                                    finalLore.add(processed.replace("{reward_lore}", rewardLine));
+                                }
+                            } else if (processed.contains("{reward_lore_")) {
+                                boolean replaced = false;
+                                for (int i = 0; i < milestoneRewardLore.size(); i++) {
+                                    String placeholder = "{reward_lore_" + i + "}";
+                                    if (processed.contains(placeholder)) {
+                                        finalLore.add(processed.replace(placeholder, milestoneRewardLore.get(i)));
+                                        replaced = true;
+                                        break;
+                                    }
+                                }
+                                if (!replaced) {
+                                    continue;
+                                }
+                            } else {
+                                finalLore.add(processed);
+                            }
+                        }
+                        lore = finalLore;
+
+                        Material mat;
+                        try {
+                            mat = Material.valueOf(materialStr);
+                        } catch (IllegalArgumentException e) {
+                            mat = Material.STONE;
+                        }
+                        ItemStack item = new ItemStack(mat);
+                        ItemMeta meta = item.getItemMeta();
+                        if (meta != null) {
+                            meta.setDisplayName(ConfigManager.colorize(name));
+                            meta.setLore(lore.stream().map(ConfigManager::colorize).toList());
+                            int cmd = stateBtn != null ? stateBtn.customModelData : btn.customModelData;
+                            if (cmd > 0) {
+                                meta.setCustomModelData(cmd);
+                            }
+                            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+                            item.setItemMeta(meta);
+                        }
+
+                        if (milestoneSlot < inventory.getSize()) {
+                            inventory.setItem(milestoneSlot, item);
+                        }
+                        slotActions.put(milestoneSlot, "CLAIM_MILESTONE");
+                        milestoneSlot++;
+                    }
+
+                    int slot = 0;
+                    for (String row : config.shape) {
+                        for (char c : row.toCharArray()) {
+                            if (c == '#') {
+                                if (inventory.getItem(slot) == null) {
+                                    inventory.setItem(slot, createBackgroundItem(config));
+                                }
+                            } else if (c == 'C') {
+                                ButtonConfig closeBtn = config.buttons.get("C");
+                                if (closeBtn != null) {
+                                    inventory.setItem(slot, createButtonItem(player, closeBtn));
+                                }
+                            } else if (c == 'G') {
+                                inventory.setItem(slot, createGiftPreviewItem(player, config, currentGift));
+                                slotActions.put(slot, "OPEN_SHOP");
+                            } else if (c != 'M') {
+                                ButtonConfig btn = config.buttons.get(String.valueOf(c));
+                                if (btn != null) {
+                                    inventory.setItem(slot, createButtonItem(player, btn));
+                                }
+                            }
+                            slot++;
+                        }
+                    }
+
+                    final Inventory inv = inventory;
+                    final Map<Integer, String> finalSlotActions = slotActions;
+                    SchedulerUtils.runTask(plugin, () -> {
+                        player.openInventory(inv);
+                        MenuSessionManager.getInstance().createSession(player, "veteran", new MenuSession(player, "veteran", config, finalSlotActions));
+                    });
+                });
+            });
+        });
+    }
+
+    private ItemStack createGiftPreviewItem(Player player, MenuConfig config, GiftManager.GiftConfig gift) {
+        ButtonConfig btn = config.buttons.get("G");
+        String materialStr = btn != null ? btn.material : "NETHER_STAR";
+        String name = btn != null && btn.name != null ? btn.name : "&e当前礼包: {gift_name}";
+        List<String> lore = btn != null && btn.lore != null ? btn.lore : new java.util.ArrayList<>();
+
+        String giftName = gift != null ? gift.name : "无";
+        List<String> giftLoreList = formatGiftConfigLore(gift);
+        String giftLore = String.join("\n", giftLoreList);
+
+        name = placeholderResolver.applyPlaceholders(name.replace("{gift_name}", giftName), player);
+
+        List<String> finalLore = new ArrayList<>();
+        for (String loreLine : lore) {
+            String processed = placeholderResolver.applyPlaceholders(loreLine, player)
+                .replace("{gift_name}", giftName)
+                .replace("{gift_lore}", giftLore);
+
+            if (processed.contains("{reward_lore}")) {
+                for (String rewardLine : giftLoreList) {
+                    finalLore.add(processed.replace("{reward_lore}", rewardLine));
+                }
+            } else if (processed.contains("{reward_lore_")) {
+                boolean replaced = false;
+                for (int i = 0; i < giftLoreList.size(); i++) {
+                    String placeholder = "{reward_lore_" + i + "}";
+                    if (processed.contains(placeholder)) {
+                        finalLore.add(processed.replace(placeholder, giftLoreList.get(i)));
+                        replaced = true;
+                        break;
+                    }
+                }
+                if (!replaced) {
+                    continue;
+                }
+            } else {
+                finalLore.add(processed);
+            }
+        }
+        lore = finalLore;
+
+        Material mat;
+        try {
+            mat = Material.valueOf(materialStr);
+        } catch (IllegalArgumentException e) {
+            mat = Material.NETHER_STAR;
+        }
+
+        ItemStack item = new ItemStack(mat);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ConfigManager.colorize(name));
+            meta.setLore(lore.stream().map(ConfigManager::colorize).toList());
+            if (btn != null && btn.customModelData > 0) {
+                meta.setCustomModelData(btn.customModelData);
+            }
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createInviteCodeItem(Player player, MenuConfig config, String inviteCode) {
+        ButtonConfig btn = config.buttons.get("C");
+        String materialStr = btn != null ? btn.material : "NAME_TAG";
+        String name = btn != null && btn.name != null ? btn.name : "&6&l我的邀请码";
+        List<String> lore = btn != null && btn.lore != null ? btn.lore : new java.util.ArrayList<>();
+
+        String displayCode = inviteCode != null ? inviteCode : "无";
+
+        name = placeholderResolver.applyPlaceholders(name.replace("{invite_code}", displayCode), player);
+        lore = lore.stream()
+            .map(s -> placeholderResolver.applyPlaceholders(s, player))
+            .map(s -> s.replace("{invite_code}", displayCode))
+            .toList();
+
+        Material mat;
+        try {
+            mat = Material.valueOf(materialStr);
+        } catch (IllegalArgumentException e) {
+            mat = Material.NAME_TAG;
+        }
+
+        ItemStack item = new ItemStack(mat);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ConfigManager.colorize(name));
+            meta.setLore(lore.stream().map(ConfigManager::colorize).toList());
+            if (btn != null && btn.customModelData > 0) {
+                meta.setCustomModelData(btn.customModelData);
+            }
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private List<String> formatGiftConfigLore(GiftManager.GiftConfig gift) {
+        if (gift == null) {
+            return List.of("&c无");
+        }
+        if (gift.lore != null && !gift.lore.isEmpty()) {
+            return new ArrayList<>(gift.lore);
+        }
+        return formatGiftRewardsLore(gift);
+    }
+
+    private List<String> formatMilestoneRewardsLore(MilestoneManager.Milestone milestone) {
+        if (milestone == null) {
+            return List.of("&c无");
+        }
+        if (milestone.lore != null && !milestone.lore.isEmpty()) {
+            return new ArrayList<>(milestone.lore);
+        }
+        if (milestone.rewards == null || milestone.rewards.isEmpty()) {
+            return List.of("&c无奖励");
+        }
+        List<String> lore = new ArrayList<>();
+        for (MilestoneManager.Reward reward : milestone.rewards) {
+            String rewardText = switch (reward.type) {
+                case "money" -> "&a" + reward.value + " 金币";
+                case "points" -> "&b" + reward.value + " 点券";
+                case "item" -> "&e" + reward.value;
+                case "command" -> "&f" + reward.value;
+                default -> "&7" + reward.type + ": " + reward.value;
+            };
+            lore.add(rewardText);
+        }
+        return lore;
+    }
+
+    private List<String> formatGiftRewardsLore(GiftManager.GiftConfig gift) {
+        if (gift == null || gift.rewards == null) {
+            return List.of("&c无");
+        }
+        List<String> lore = new ArrayList<>();
+        for (MilestoneManager.Reward reward : gift.rewards) {
+            String rewardText = switch (reward.type) {
+                case "money" -> "&a" + reward.value + " 金币";
+                case "points" -> "&b" + reward.value + " 点券";
+                case "item" -> "&e" + reward.value;
+                case "command" -> "&f" + reward.value;
+                default -> "&7" + reward.type + ": " + reward.value;
+            };
+            lore.add(rewardText);
+        }
+        return lore;
+    }
+
+    private void createShopInventory(Player player, MenuConfig config, Inventory inventory, Map<Integer, String> slotActions) {
+        int size = config.shape.size() * 9;
+        String title = ConfigManager.colorize(config.title);
+
+        plugin.getDatabaseManager().getPurchasedGifts(player.getUniqueId()).thenAccept(purchasedGifts -> {
+            plugin.getDatabaseManager().getGiftId(player.getUniqueId()).thenAccept(currentGiftId -> {
+                Map<String, GiftManager.GiftConfig> gifts = plugin.getGiftManager().getAllGifts();
+
+                int giftSlot = 10;
+                for (GiftManager.GiftConfig gift : gifts.values()) {
+                    boolean isPurchased = purchasedGifts.contains(gift.id);
+                    boolean isCurrent = currentGiftId != null && currentGiftId.equals(gift.id);
+                    String state = isCurrent ? "current" : (isPurchased ? "purchased" : "available");
+
+                    ButtonConfig btn = config.buttons.get("G");
+                    ButtonConfig stateBtn = btn != null && btn.stateOverrides != null ?
+                        btn.stateOverrides.get(state) : null;
+
+                    String materialStr;
+                    String name;
+                    List<String> lore;
+                    int customModelData;
+
+                    if (stateBtn != null) {
+                        materialStr = stateBtn.material != null && !stateBtn.material.contains("{") ?
+                            stateBtn.material : gift.material;
+                        name = stateBtn.name != null && !stateBtn.name.contains("{") ?
+                            stateBtn.name : gift.name;
+                        lore = stateBtn.lore != null && !stateBtn.lore.isEmpty() ?
+                            stateBtn.lore : btn.lore;
+                        customModelData = stateBtn.customModelData;
+                    } else {
+                        materialStr = gift.material;
+                        name = gift.name;
+                        lore = btn.lore;
+                        customModelData = gift.customModelData;
+                    }
+
+                    name = placeholderResolver.applyPlaceholders(name.replace("{name}", gift.name), player);
+
+                    List<String> rewardLore = formatGiftConfigLore(gift);
+                    List<String> finalLore = new ArrayList<>();
+                    for (String line : lore) {
+                        String processed = placeholderResolver.applyPlaceholders(line, player);
+                        processed = processed.replace("{price_money}", String.valueOf(gift.priceMoney))
+                            .replace("{price_points}", String.valueOf(gift.pricePoints));
+
+                        if (processed.contains("{reward_lore}")) {
+                            for (String rewardLine : rewardLore) {
+                                finalLore.add(processed.replace("{reward_lore}", rewardLine));
+                            }
+                        } else if (processed.contains("{reward_lore_")) {
+                            boolean replaced = false;
+                            for (int i = 0; i < rewardLore.size(); i++) {
+                                String placeholder = "{reward_lore_" + i + "}";
+                                if (processed.contains(placeholder)) {
+                                    finalLore.add(processed.replace(placeholder, rewardLore.get(i)));
+                                    replaced = true;
+                                    break;
+                                }
+                            }
+                            if (!replaced) {
+                                continue;
+                            }
+                        } else {
+                            finalLore.add(processed);
+                        }
+                    }
+                    lore = finalLore;
+
+                    Material mat;
+                    try {
+                        mat = Material.valueOf(materialStr);
+                    } catch (IllegalArgumentException e) {
+                        mat = Material.DIAMOND;
+                    }
+
+                    ItemStack item = new ItemStack(mat);
+                    ItemMeta meta = item.getItemMeta();
+                    if (meta != null) {
+                        meta.setDisplayName(ConfigManager.colorize(name));
+                        meta.setLore(lore.stream().map(ConfigManager::colorize).toList());
+                        if (customModelData > 0) {
+                            meta.setCustomModelData(customModelData);
+                        }
+                        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+                        item.setItemMeta(meta);
+                    }
+
+                    if (giftSlot < size) {
+                        inventory.setItem(giftSlot, item);
+                    }
+                    slotActions.put(giftSlot, "BUY_GIFT");
+                    giftSlot++;
+                }
+
+                int slot = 0;
+                for (String row : config.shape) {
+                    for (char c : row.toCharArray()) {
+                        if (c == '#') {
+                            if (inventory.getItem(slot) == null) {
+                                inventory.setItem(slot, createBackgroundItem(config));
+                            }
+                        } else if (c != 'G') {
+                            ButtonConfig btn = config.buttons.get(String.valueOf(c));
+                            if (btn != null) {
+                                inventory.setItem(slot, createButtonItem(player, btn));
+                            }
+                        }
+                        slot++;
+                    }
+                }
+
+                final Inventory inv = inventory;
+                final Map<Integer, String> finalSlotActions = slotActions;
+                SchedulerUtils.runTask(plugin, () -> {
+                    player.openInventory(inv);
+                    MenuSessionManager.getInstance().createSession(player, "shop", new MenuSession(player, "shop", config, finalSlotActions));
+                });
+            });
+        });
+    }
+
+    private ItemStack createCurrentGiftPreviewSync(Player player) {
+        String giftId = plugin.getDatabaseManager().getGiftId(player.getUniqueId()).join();
+        String defaultGiftId = plugin.getConfigManager().getConfig()
+            .getString("new_player_reward.default_gift_id", "default");
+        boolean requireGift = plugin.getConfigManager().getConfig()
+            .getBoolean("new_player_reward.require_gift", false);
+
+        String finalGiftId = giftId;
+        if (finalGiftId == null) {
+            if (requireGift) {
+                finalGiftId = "none";
+            } else {
+                finalGiftId = defaultGiftId;
+            }
+        }
+
+        GiftManager.GiftConfig gift = plugin.getGiftManager().getGift(finalGiftId);
+
+        ItemStack item;
+        if (gift != null) {
+            item = new ItemStack(Material.valueOf(gift.material));
+            ItemMeta meta = item.getItemMeta();
+            String name = plugin.getConfigManager().getMenusConfig().getString("shop_menu.buttons.W.name", "&e当前生效礼包: {name}");
+            name = name.replace("{name}", gift.name);
+            meta.setDisplayName(ConfigManager.colorize(name));
+
+            List<String> lore = plugin.getConfigManager().getMenusConfig().getStringList("shop_menu.buttons.W.lore");
+            List<String> loreComponents = new ArrayList<>();
+            for (String line : lore) {
+                if (line.contains("{lore_lines}")) {
+                    for (String giftLore : gift.lore) {
+                        loreComponents.add(ConfigManager.colorize("&7" + giftLore));
+                    }
+                } else {
+                    loreComponents.add(ConfigManager.colorize(line));
+                }
+            }
+            meta.setLore(loreComponents);
+            if (gift.customModelData > 0) {
+                meta.setCustomModelData(gift.customModelData);
+            }
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+            item.setItemMeta(meta);
+        } else {
+            item = new ItemStack(Material.valueOf(
+                plugin.getConfigManager().getMenusConfig().getString("gift_shop.default_gift_preview.material", "BARRIER")));
+            ItemMeta meta = item.getItemMeta();
+            String name = plugin.getConfigManager().getMenusConfig().getString("gift_shop.default_gift_preview.name", "&c未购买礼包");
+            meta.setDisplayName(ConfigManager.colorize(name));
+            List<String> lore = plugin.getConfigManager().getMenusConfig().getStringList("gift_shop.default_gift_preview.lore");
+            meta.setLore(lore.stream().map(ConfigManager::colorize).toList());
+            int cmd = plugin.getConfigManager().getMenusConfig().getInt("gift_shop.default_gift_preview.custom-model-data", 0);
+            if (cmd > 0) {
+                meta.setCustomModelData(cmd);
+            }
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+            item.setItemMeta(meta);
+        }
+
+        return item;
+    }
+
+    private ItemStack createBackgroundItem(MenuConfig config) {
+        ItemStack item = new ItemStack(Material.valueOf(config.backgroundMaterial));
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName(ConfigManager.colorize(config.backgroundName));
+        meta.setLore(config.backgroundLore.stream().map(ConfigManager::colorize).toList());
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack createButtonItem(Player player, ButtonConfig btn) {
+        ItemStack item = new ItemStack(Material.valueOf(btn.material));
+        ItemMeta meta = item.getItemMeta();
+        String name = placeholderResolver.applyPlaceholders(btn.name, player);
+        List<String> lore = btn.lore.stream()
+            .map(s -> placeholderResolver.applyPlaceholders(s, player))
+            .toList();
+        meta.setDisplayName(ConfigManager.colorize(name));
+        meta.setLore(lore.stream().map(ConfigManager::colorize).toList());
+        if (btn.customModelData > 0) {
+            meta.setCustomModelData(btn.customModelData);
+        }
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private String getStatusText(String state) {
+        return switch (state) {
+            case "locked" -> "未解锁";
+            case "available" -> "可领取";
+            case "claimed" -> "已领取";
+            default -> state;
+        };
+    }
+
+    private Set<String> parseJsonArray(String json) {
+        if (json == null || json.equals("[]")) {
+            return new HashSet<>();
+        }
+        String trimmed = json.substring(1, json.length() - 1);
+        if (trimmed.isEmpty()) {
+            return new HashSet<>();
+        }
+        Set<String> result = new HashSet<>();
+        for (String s : trimmed.split(",")) {
+            result.add(s.replace("\"", "").trim());
+        }
+        return result;
+    }
+
+    public String getButtonAction(String menuName, String buttonKey) {
+        MenuConfig config = menus.get(menuName);
+        if (config == null) return "NONE";
+        ButtonConfig btn = config.buttons.get(buttonKey);
+        return btn != null ? btn.action : "NONE";
+    }
+
+    public static class MenuConfig {
+        public String title;
+        public List<String> shape;
+        public Map<String, ButtonConfig> buttons;
+        public String backgroundMaterial;
+        public String backgroundName;
+        public List<String> backgroundLore;
+    }
+
+    public static class ButtonConfig {
+        public String material;
+        public String name;
+        public List<String> lore;
+        public String action;
+        public boolean isDynamic;
+        public Map<String, ButtonConfig> stateOverrides;
+        public int customModelData;
+    }
+
+    public static class MenuHolder implements InventoryHolder {
+        private final String title;
+
+        public MenuHolder(String title) {
+            this.title = title;
+        }
+
+        @Override
+        public Inventory getInventory() {
+            return null;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+    }
+}

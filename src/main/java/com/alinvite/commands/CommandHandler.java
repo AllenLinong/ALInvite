@@ -1,0 +1,375 @@
+package com.alinvite.commands;
+
+import com.alinvite.ALInvite;
+import com.alinvite.config.ConfigManager;
+import org.bukkit.Bukkit;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
+public class CommandHandler implements CommandExecutor, TabCompleter {
+
+    private final ALInvite plugin;
+
+    public CommandHandler(ALInvite plugin) {
+        this.plugin = plugin;
+    }
+
+    @Override
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+        if (args.length == 0) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage(plugin.getConfigManager().getMessage("errors.player_only"));
+                return true;
+            }
+            plugin.getMenuManager().openMainMenu(player);
+            return true;
+        }
+
+        String subCommand = args[0].toLowerCase();
+
+        switch (subCommand) {
+            case "code" -> handleCode(sender);
+            case "stats" -> handleStats(sender);
+            case "buygift" -> handleBuyGift(sender);
+            case "help" -> handleHelp(sender);
+            case "admin" -> handleAdmin(sender, args);
+            default -> sender.sendMessage(plugin.getConfigManager().getMessage("errors.unknown"));
+        }
+
+        return true;
+    }
+
+    private void handleCode(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(plugin.getConfigManager().getMessage("errors.player_only"));
+            return;
+        }
+
+        if (!player.hasPermission("alinvite.use")) {
+            player.sendMessage(plugin.getConfigManager().getMessage("errors.no_permission"));
+            return;
+        }
+
+        // 检查玩家是否有老玩家权限
+        String veteranPermission = plugin.getConfigManager().getConfig()
+            .getString("invite_code.veteran_permission", "alinvite.veteran");
+        
+        if (!player.hasPermission(veteranPermission)) {
+            player.sendMessage(plugin.getConfigManager().getMessage("errors.no_invite_code"));
+            return;
+        }
+
+        plugin.getInviteManager().getInviteCode(player.getUniqueId()).thenCompose(code -> {
+            if (code == null) {
+                return plugin.getInviteManager().generateInviteCode(player.getUniqueId());
+            }
+            return CompletableFuture.completedFuture(code);
+        }).thenAccept(code -> {
+            String message = plugin.getConfigManager().getMessage("commands.code").replace("{invite_code}", code);
+            player.sendMessage(message);
+        });
+    }
+
+    private void handleHelp(CommandSender sender) {
+        String message = plugin.getConfigManager().getMessage("commands.help");
+        sender.sendMessage(message);
+    }
+
+    private void handleStats(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(plugin.getConfigManager().getMessage("errors.player_only"));
+            return;
+        }
+
+        if (!player.hasPermission("alinvite.use")) {
+            player.sendMessage(plugin.getConfigManager().getMessage("errors.no_permission"));
+            return;
+        }
+
+        plugin.getInviteManager().getTotalInvites(player.getUniqueId()).thenAccept(total -> {
+            String claimed = plugin.getDatabaseManager().getClaimedMilestones(player.getUniqueId()).join();
+            String giftId = plugin.getDatabaseManager().getGiftId(player.getUniqueId()).join();
+            String giftName = "无";
+
+            if (giftId != null) {
+                var gift = plugin.getGiftManager().getGift(giftId);
+                if (gift != null) {
+                    giftName = ConfigManager.colorize(gift.name);
+                }
+            }
+
+            String message = plugin.getConfigManager().getMessage("commands.stats")
+                .replace("{total}", String.valueOf(total))
+                .replace("{claimed_milestones}", claimed)
+                .replace("{gift_name}", giftName);
+
+            player.sendMessage(message);
+        });
+    }
+
+    private void handleBuyGift(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(plugin.getConfigManager().getMessage("errors.player_only"));
+            return;
+        }
+
+        if (!player.hasPermission("alinvite.buygift")) {
+            player.sendMessage(plugin.getConfigManager().getMessage("errors.no_permission"));
+            return;
+        }
+
+        plugin.getMenuManager().openShopMenu(player);
+    }
+
+    private void handleAdmin(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("alinvite.admin")) {
+            sender.sendMessage(plugin.getConfigManager().getMessage("errors.no_permission"));
+            return;
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage("&6===== ALInvite 管理指令 =====");
+            sender.sendMessage("&e/alinvite admin help &7- 显示帮助信息");
+            sender.sendMessage("&e/alinvite admin reload &7- 重载插件配置");
+            sender.sendMessage("&e/alinvite admin givecode <玩家> &7- 生成邀请码");
+            sender.sendMessage("&e/alinvite admin clearcode <玩家> &7- 清除玩家邀请码");
+            sender.sendMessage("&e/alinvite admin addinvite <玩家> <数量> &7- 增加邀请次数");
+            sender.sendMessage("&e/alinvite admin reset <玩家> &7- 重置玩家邀请数据");
+            sender.sendMessage("&e/alinvite admin announce &7- 发送全服公告");
+            sender.sendMessage("&6============================");
+            return;
+        }
+
+        String adminSub = args[1].toLowerCase();
+
+        switch (adminSub) {
+            case "help" -> {
+                sender.sendMessage(plugin.getConfigManager().getMessageRaw("commands.admin.help"));
+            }
+            case "reload" -> {
+                plugin.reload();
+                sender.sendMessage(plugin.getConfigManager().getMessage("commands.reload"));
+            }
+            case "givecode" -> {
+                if (args.length < 3) {
+                    sender.sendMessage("用法: /alinvite admin givecode <玩家>");
+                    return;
+                }
+                Player target = Bukkit.getPlayer(args[2]);
+                if (target == null) {
+                    sender.sendMessage("玩家不存在或不在线");
+                    return;
+                }
+                plugin.getInviteManager().generateInviteCode(target.getUniqueId()).thenAccept(code -> {
+                    String message = plugin.getConfigManager().getMessage("commands.admin.givecode_success")
+                        .replace("{player}", target.getName())
+                        .replace("{invite_code}", code);
+                    sender.sendMessage(message);
+                });
+            }
+            case "clearcode" -> {
+                if (args.length < 3) {
+                    sender.sendMessage("用法: /alinvite admin clearcode <玩家>");
+                    return;
+                }
+                UUID targetUuid = getPlayerUuid(args[2]);
+                if (targetUuid == null) {
+                    sender.sendMessage("玩家不存在");
+                    return;
+                }
+
+                plugin.getDatabaseManager().clearInviteCode(targetUuid).join();
+                plugin.getCacheManager().invalidateInviteCode(targetUuid);
+
+                String msg = plugin.getConfigManager().getMessage("commands.admin.clearcode_success")
+                    .replace("{player}", args[2]);
+                sender.sendMessage(msg);
+            }
+            case "addinvite" -> {
+                if (args.length < 4) {
+                    sender.sendMessage("用法: /alinvite admin addinvite <玩家> <数量>");
+                    return;
+                }
+                Player target = Bukkit.getPlayer(args[2]);
+                if (target == null) {
+                    sender.sendMessage("玩家不存在或不在线");
+                    return;
+                }
+                int amount;
+                try {
+                    amount = Integer.parseInt(args[3]);
+                } catch (NumberFormatException e) {
+                    sender.sendMessage("数量必须是数字");
+                    return;
+                }
+
+                plugin.getDatabaseManager().getPlayerData(target.getUniqueId()).thenAccept(data -> {
+                    if (data != null) {
+                        int newTotal = data.totalInvites + amount;
+                        plugin.getDatabaseManager().updateInviteCount(target.getUniqueId(), newTotal).join();
+                        plugin.getCacheManager().invalidateStats(target.getUniqueId());
+                        plugin.getMilestoneManager().checkMilestones(target.getUniqueId(), newTotal);
+
+                        String message = plugin.getConfigManager().getMessage("commands.admin.addinvite_success")
+                            .replace("{player}", target.getName())
+                            .replace("{amount}", String.valueOf(amount));
+                        sender.sendMessage(message);
+                    }
+                });
+            }
+            case "reset" -> {
+                if (args.length < 3) {
+                    sender.sendMessage("用法: /alinvite admin reset <玩家>");
+                    return;
+                }
+                UUID targetUuid = getPlayerUuid(args[2]);
+                if (targetUuid == null) {
+                    sender.sendMessage("玩家不存在");
+                    return;
+                }
+
+                plugin.getDatabaseManager().resetPlayerData(targetUuid).join();
+                plugin.getCacheManager().invalidateStats(targetUuid);
+                plugin.getCacheManager().invalidateInviteCode(targetUuid);
+                plugin.getCacheManager().invalidateGiftId(targetUuid);
+
+                String message = plugin.getConfigManager().getMessage("commands.admin.reset_success")
+                    .replace("{player}", args[2]);
+                sender.sendMessage(message);
+            }
+            case "announce" -> {
+                if (args.length < 4) {
+                    sender.sendMessage("用法: /alinvite admin announce <玩家> <里程碑值>");
+                    return;
+                }
+                Player target = Bukkit.getPlayer(args[2]);
+                if (target == null) {
+                    sender.sendMessage("玩家不存在或不在线");
+                    return;
+                }
+                int milestoneValue;
+                try {
+                    milestoneValue = Integer.parseInt(args[3]);
+                } catch (NumberFormatException e) {
+                    sender.sendMessage("里程碑值必须是数字");
+                    return;
+                }
+
+                var milestone = plugin.getMilestoneManager().getMilestone(milestoneValue);
+                if (milestone != null) {
+                    String message = plugin.getConfigManager().getConfig()
+                        .getString("announcements.messages." + milestoneValue,
+                            plugin.getConfigManager().getConfig()
+                                .getString("announcements.messages.default", ""));
+                    message = message.replace("{player}", target.getName())
+                        .replace("{total}", String.valueOf(milestoneValue))
+                        .replace("{milestone_name}", milestone.name);
+                    plugin.getServer().broadcastMessage(ConfigManager.colorize(message));
+
+                    sender.sendMessage(plugin.getConfigManager().getMessage("commands.admin.announce_success"));
+                }
+            }
+            case "checkgroup" -> {
+                if (args.length < 3) {
+                    sender.sendMessage("用法: /alinvite admin checkgroup <玩家>");
+                    return;
+                }
+                Player target = Bukkit.getPlayer(args[2]);
+                if (target == null) {
+                    sender.sendMessage("玩家不存在或不在线");
+                    return;
+                }
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    plugin.getPermissionGroupRewardListener().manualCheck(target);
+                    sender.sendMessage("已为玩家 " + target.getName() + " 检查权限组奖励");
+                });
+            }
+            default -> {
+                sender.sendMessage("&6===== ALInvite 管理指令 =====");
+                sender.sendMessage("&e/alinvite admin help &7- 显示帮助信息");
+                sender.sendMessage("&e/alinvite admin reload &7- 重载插件配置");
+                sender.sendMessage("&e/alinvite admin givecode <玩家> &7- 生成邀请码");
+                sender.sendMessage("&e/alinvite admin addinvite <玩家> <数量> &7- 增加邀请次数");
+                sender.sendMessage("&e/alinvite admin reset <玩家> &7- 重置玩家邀请数据");
+                sender.sendMessage("&e/alinvite admin announce <玩家> <里程碑值> &7- 发送全服公告");
+                sender.sendMessage("&6============================");
+            }
+        }
+    }
+
+    private UUID getPlayerUuid(String name) {
+        var offline = Bukkit.getOfflinePlayer(name);
+        return offline.hasPlayedBefore() ? offline.getUniqueId() : null;
+    }
+
+    @Override
+    public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
+        List<String> completions = new ArrayList<>();
+
+        if (args.length == 1) {
+            completions.addAll(Arrays.asList("code", "stats", "buygift", "help", "admin"));
+            return filterByInput(completions, args[0]);
+        }
+
+        if (args.length == 2 && args[0].equalsIgnoreCase("admin")) {
+            completions.addAll(Arrays.asList("reload", "givecode", "addinvite", "reset", "announce"));
+            return filterByInput(completions, args[1]);
+        }
+
+        if (args.length == 3 && args[1].equalsIgnoreCase("givecode")) {
+            return filterByInput(
+                Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList()),
+                args[2]
+            );
+        }
+
+        if (args.length == 3 && args[1].equalsIgnoreCase("addinvite")) {
+            return filterByInput(
+                Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList()),
+                args[2]
+            );
+        }
+
+        if (args.length == 3 && args[1].equalsIgnoreCase("reset")) {
+            return filterByInput(
+                Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList()),
+                args[2]
+            );
+        }
+
+        if (args.length == 4 && args[1].equalsIgnoreCase("addinvite")) {
+            return filterByInput(Arrays.asList("1", "5", "10", "100"), args[3]);
+        }
+
+        if (args.length == 4 && args[1].equalsIgnoreCase("announce")) {
+            return filterByInput(
+                plugin.getMilestoneManager().getMilestones().keySet().stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.toList()),
+                args[3]
+            );
+        }
+
+        return completions;
+    }
+
+    private List<String> filterByInput(List<String> list, String input) {
+        if (input.isEmpty()) return list;
+        String lowerInput = input.toLowerCase();
+        return list.stream()
+            .filter(s -> s.toLowerCase().startsWith(lowerInput))
+            .collect(Collectors.toList());
+    }
+}

@@ -1,0 +1,75 @@
+# ============================================================
+# ALInvite Language File - English (US)
+# ============================================================
+
+prefix: "&6[Invite System] &r"
+
+commands:
+  reload: "&aConfiguration reloaded"
+  code: "&aYour invite code: &e{invite_code}"
+  stats: |
+    &a========== Invite Stats ==========
+    &7Total invites: &e{total}
+    &7Claimed milestones: &e{claimed_milestones}
+    &7Current gift: &e{gift_name}
+  buygift:
+    success: "&aSuccessfully purchased gift {gift_name}&a! New players you invite will now receive this gift."
+    switch_success: "&aSuccessfully switched to gift {gift_name}&a!"
+    already_active: "&cGift {gift_name} &cis already your active gift!"
+    fail_money: "&cInsufficient gold, need {price} gold"
+    fail_points: "&cInsufficient points, need {price} points"
+    already_owned: "&cYou already own this gift"
+  admin:
+    help: |
+      &6===== ALInvite Admin Commands =====
+      &e/alinvite admin help &7- Show help
+      &e/alinvite admin reload &7- Reload config
+      &e/alinvite admin givecode <player> &7- Generate invite code
+      &e/alinvite admin clearcode <player> &7- Clear invite code
+      &e/alinvite admin addinvite <player> <amount> &7- Add invites
+      &e/alinvite admin reset <player> &7- Reset player data
+      &e/alinvite admin announce <player> <milestone> &7- Send announcement
+      &6===================================
+    givecode_success: "&aGenerated invite code {invite_code} for player {player}"
+    clearcode_success: "&aCleared invite code for player {player}"
+    addinvite_success: "&aAdded {amount} invites for player {player}"
+    reset_success: "&aReset invite data for player {player}"
+    announce_success: "&aAnnouncement sent"
+  help: |
+    &6===== ALInvite Commands =====
+    &e/alinvite &7- Open invite menu
+    &e/alinvite code &7- View your invite code
+    &e/alinvite stats &7- View invite stats
+    &6===== ALInvite Admin Commands =====
+    &e/alinvite admin &7- Admin commands help
+
+errors:
+  player_only: "&cOnly players can execute this command"
+  no_permission: "&cYou don't have permission"
+  unknown: "&cUnknown command"
+  invalid_code: "&cInvalid invite code"
+  already_used: "&cYou have already used an invite code"
+  veteran_cannot_bind: "&cYou are already a veteran player, cannot bind another veteran's invite code"
+  not_registered: "&cYou haven't registered an invite code, please contact admin"
+
+milestone:
+  reached: "&aCongratulations! You've reached {name} milestone and received rewards!"
+  already_claimed: "&cYou have already claimed this milestone reward"
+  claim_success: "&aClaimed {name} milestone reward"
+  not_unlocked: "&c{name} milestone is locked. You need to invite {remaining} more players"
+  unlocked: "&a{name} milestone unlocked! Please claim your reward in the menu!"
+
+permission_group_reward:
+  money: "&aPlayer &e{player} &ajoined group &6{group}&a, you received &e{money} &agold reward!"
+  points: "&aPlayer &e{player} &ajoined group &6{group}&a, you received &e{points} &apoints reward!"
+  offline_money: "&aPlayer &e{player} &ajoined group &6{group}&a, you received &e{money} &agold reward (offline)!"
+  offline_points: "&aPlayer &e{player} &ajoined group &6{group}&a, you received &e{points} &apoints reward (offline)!"
+
+dialog:
+  cancel: "&cCancelled invite code input"
+  timeout: "&cInput timeout, please click the button again"
+  prompt: "&aPlease enter invite code (press {cancel_key} to cancel)"
+  success: "&aInvite code verified! You received rewards"
+  fail: "&cInvalid invite code"
+  ip_limit: "&cYour IP has been used by another player for invite code"
+  self_invite: "&cYou cannot use your own invite code"

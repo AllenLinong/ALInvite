@@ -4,8 +4,6 @@ import com.alinvite.commands.CommandHandler;
 import com.alinvite.config.ConfigManager;
 import com.alinvite.database.DatabaseManager;
 import com.alinvite.gui.MenuManager;
-import com.alinvite.integration.SafeMinePayListener;
-import com.alinvite.integration.SafeSweetCheckoutListener;
 import com.alinvite.listeners.InviteListener;
 import com.alinvite.listeners.LuckPermsListener;
 import com.alinvite.listeners.MenuListener;
@@ -155,31 +153,9 @@ public class ALInvite extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(menuListener, this);
         Bukkit.getPluginManager().registerEvents(permissionGroupRewardListener, this);
         Bukkit.getPluginManager().registerEvents(new LuckPermsListener(this, permissionGroupRewardListener), this);
-        
-        // 条件注册第三方充值插件监听器（避免使用抽象事件类）
-        registerThirdPartyListeners();
     }
     
-    private void registerThirdPartyListeners() {
-        // 使用反射安全地注册第三方插件监听器
-        try {
-            // 检查MinePay插件是否存在
-            if (Bukkit.getPluginManager().getPlugin("MinePay") != null) {
-                // 使用安全的事件监听器
-                Bukkit.getPluginManager().registerEvents(new SafeMinePayListener(this), this);
-                getLogger().info("已注册 MinePay 事件监听器");
-            }
-            
-            // 检查SweetCheckout插件是否存在
-            if (Bukkit.getPluginManager().getPlugin("SweetCheckout") != null) {
-                // 使用安全的事件监听器
-                Bukkit.getPluginManager().registerEvents(new SafeSweetCheckoutListener(this), this);
-                getLogger().info("已注册 SweetCheckout 事件监听器");
-            }
-        } catch (Exception e) {
-            getLogger().warning("注册第三方插件监听器时出错: " + e.getMessage());
-        }
-    }
+
 
     private void initPlaceholder() {
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {

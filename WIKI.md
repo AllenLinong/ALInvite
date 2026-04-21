@@ -6,19 +6,22 @@
 
 ### ✨ 主要特性
 
-| 功能模块           | 描述                |
-| -------------- | ----------------- |
-| 🔑 **智能邀请码系统** | 每个老玩家拥有独立的邀请码     |
-| 🎁 **礼包商店**    | 老玩家可购买不同等级的礼包     |
-| 🏆 **里程碑系统**   | 累计邀请达到指定人数时发放额外奖励 |
-| 📢 **全服公告**    | 里程碑达成时自动全服广播      |
-| 🛡️ **IP限制**   | 防止刷小号和作弊行为        |
-| 🌐 **多语言支持**   | 内置中文和英文语言包        |
-| 🖥️ **GUI菜单**  | 直观易用的图形界面         |
-| ⚡ **权限组奖励**    | 与LuckPerms等权限插件集成 |
-| 💰 **第三方充值返点** | 支持第三方充值系统的返点功能    |
-| ⚡ **Folia兼容性** | 完全支持Folia多线程服务器   |
-| 🚀 **性能优化**    | 数据库索引、缓存、异步处理优化   |
+| 功能模块           | 描述                 |
+| -------------- | ------------------ |
+| 🔑 **智能邀请码系统** | 每个老玩家拥有独立的邀请码      |
+| 🎁 **礼包商店**    | 老玩家可购买不同等级的礼包      |
+| 🏆 **里程碑系统**   | 累计邀请达到指定人数时发放额外奖励  |
+| 📢 **全服公告**    | 里程碑达成时自动全服广播       |
+| 🛡️ **IP限制**   | 防止刷小号和作弊行为         |
+| 🔒 **功能权限控制** | 同IP绑定功能权限限制         |
+| 🌐 **多语言支持**   | 内置中文和英文语言包         |
+| 🖥️ **GUI菜单**  | 直观易用的图形界面          |
+| ⚡ **权限组奖励**    | 与LuckPerms等权限插件集成  |
+| 💰 **点券充值返点**  | 支持点券充值返点功能         |
+| 💵 **现金返点系统**  | 支持现金返点记录和兑换功能      |
+| 🔌 **第三方集成**   | 支持通过命令调用方式与第三方插件集成 |
+| ⚡ **Folia兼容性** | 完全支持Folia多线程服务器    |
+| 🚀 **性能优化**    | 数据库索引、缓存、异步处理优化    |
 
 ## 🚀 安装指南
 
@@ -32,7 +35,7 @@
 
 ### 📦 安装步骤
 
-1. 📥 将 `ALInvite-1.0.6-shaded.jar` 文件放入服务器的 `plugins` 文件夹
+1. 📥 将 `ALInvite-1.0.7-shaded.jar` 文件放入服务器的 `plugins` 文件夹
 2. 🔄 重启服务器
 3. ⚙️ 插件会自动生成配置文件
 4. ✏️ 根据需要修改配置文件
@@ -92,258 +95,253 @@
 | 📢 `/alinvite admin announce <玩家> <里程碑值>` | 发送全服公告   | `alinvite.admin` |
 | 👥 `/alinvite admin checkgroup <玩家>`      | 检查权限组奖励  | `alinvite.admin` |
 | 💰 `/alinvite givedj <玩家> <数量>`           | 为玩家充值点券  | `alinvite.admin` |
+| 💵 `/alinvite admin cashrebate <玩家> [金额]` | 现金返点管理   | `alinvite.admin` |
+| 🔄 `/alinvite admin exchange <玩家> <金额>`   | 现金返点兑换   | `alinvite.admin` |
 
 ## ⚙️ 配置文件详解
 
-### 🌐 语言设置
+### 🔧 基础配置
 
 ```yaml
-language:
-  locale: "zh_cn"  # 语言文件标识
-```
-
-### 🔑 邀请码设置
-
-```yaml
+# 邀请码配置
 invite_code:
-  length: 6                    # 邀请码长度
-  charset: "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789"
-  prefix: ""                   # 邀请码前缀
-  veteran_permission: "alinvite.veteran"
-  use_permission: "alinvite.use"
-  allow_veteran_to_bind: false  # 是否允许老玩家绑定老玩家
+  enabled: true                    # 是否启用邀请码系统
+  veteran_permission: "alinvite.veteran"  # 老玩家权限节点
+  code_length: 8                   # 邀请码长度
+  
+# 新玩家奖励
+new_player_reward:
+  enabled: true                    # 是否启用新玩家奖励
+  require_gift: false              # 是否需要礼包才能发放奖励
+  
+# 里程碑系统
+milestone:
+  enabled: true                    # 是否启用里程碑系统
+  announce_enabled: true           # 是否启用全服公告
 ```
 
-### 🛡️ IP限制设置
+### 💰 点券充值返点系统
 
 ```yaml
+# 点券充值返点配置
+points_rebate:
+  enabled: true                    # 是否启用点券充值返点功能
+  
+  # 点券发放命令
+  points_command: "points give {player} {amount}"
+  
+  # 权限组返点比例
+  permission_prefix: "alinvite.rebate"
+  
+  # 返点限制
+  limits:
+    min_amount: 10.0               # 最低充值金额
+    max_rebate_per_day: 1000.0     # 每日返点上限
+```
+
+### 💵 现金返点系统
+
+```yaml
+# 现金返点配置
+cash_rebate:
+  enabled: true                    # 是否启用现金返点系统
+  
+  # 权限组现金返点模式
+  permission_groups:
+    vip:
+      rebate_rate: 0.15            # 返点比例
+      cash_mode: false             # 是否为现金返点模式
+```
+
+## 🔒 功能权限控制系统
+
+ALInvite 提供强大的功能权限控制系统，允许管理员灵活控制同IP绑定的功能权限，既防止作弊又兼顾用户体验。
+
+### ⚙️ 配置说明
+
+在 `config.yml` 中配置功能权限控制：
+
+```yaml
+# ==================== IP 限制 ====================
 ip_restriction:
-  enabled: false               # 是否启用IP限制
-  max_invites_per_ip: 1       # 同一IP最大邀请次数
-  prevent_self_ip: false      # 禁止同一IP互相邀请
+  enabled: false                 # 是否启用同IP绑定限制
+  # 如果 enabled=true：完全禁止同IP绑定（下面的配置无效）
+  # 如果 enabled=false：允许同IP绑定，但根据 flexible_mode 限制功能
+  flexible_mode:
+    milestone: false             # 里程碑功能（false = 禁用，同IP绑定不增加里程碑计数）
+    rebate: true                 # 返点功能（true = 启用，同IP绑定可以获得返点）
+    gift: false                  # 礼包功能（false = 禁用，同IP绑定没有新玩家礼包）
 ```
 
-### 🏆 里程碑系统配置
+### 🔄 执行逻辑
 
-| 里程碑        | 名称   | 奖励                              |
-| ---------- | ---- | ------------------------------- |
-| ⭐ **1人**   | 社交新星 | 1000 EMC积分 + 100金币 + 10点券       |
-| ✨ **5人**   | 社交达人 | 10000 EMC积分 + 500金币 + 50点券      |
-| 🔥 **10人** | 社交传奇 | 100000 EMC积分 + 10000金币 + 1000点券 |
+#### 场景1：严格模式（enabled: true）
+- **完全禁止**同IP绑定
+- 同一个IP只能有一个玩家绑定邀请码
+- **完全防作弊**，适合严格管理的服务器
+
+#### 场景2：灵活模式（enabled: false）
+- **允许**同IP绑定，但所有同IP绑定都根据配置限制功能
+- **所有同IP绑定**都受同样的功能权限限制
+- 没有"第一个绑定不受限制"的特殊处理
+
+### 💡 实际应用
+
+#### 家庭用户场景
+- 玩家A（家庭IP）绑定 → ✅ 获得返点功能，❌ 无法获得里程碑和礼包
+- 玩家B（同家庭IP）绑定 → ✅ 获得返点功能，❌ 无法获得里程碑和礼包
+- **优势**：家庭多个玩家都能参与，但防止刷奖励
+
+#### 网吧/学校场景
+- 玩家C（网吧IP）绑定 → ✅ 获得返点功能，❌ 无法获得里程碑和礼包
+- 玩家D（同网吧IP）绑定 → ✅ 获得返点功能，❌ 无法获得里程碑和礼包
+- **优势**：公共环境也能使用，但限制作弊行为
+
+### 🎯 功能权限控制效果
+
+| 功能模块 | 同IP绑定效果 | 说明 |
+|----------|--------------|------|
+| **里程碑功能** | ❌ 禁用 | 同IP绑定不增加里程碑计数 |
+| **返点功能** | ✅ 启用 | 同IP绑定可以获得返点 |
+| **礼包功能** | ❌ 禁用 | 同IP绑定没有新玩家礼包 |
+
+### 🔧 技术特点
+
+1. **永久绑定**：功能权限状态永久记录在数据库中
+2. **智能检测**：自动检测同IP绑定顺序
+3. **详细提示**：玩家绑定时会收到明确的功能状态说明
+4. **灵活配置**：管理员可以自由配置功能限制规则
+
+## 🔌 第三方插件集成
+
+ALInvite 提供了多种集成方式，包括命令调用和API集成，为第三方插件提供灵活的集成方案。
+
+### 💰 充值插件集成
+
+#### 命令调用方式
+在第三方充值插件的配置文件中添加以下命令：
 
 ```yaml
-milestones:
-  auto_claim: false           # 是否自动发放奖励
-  1:
-    name: "社交新星"
-    lore:
-      - "&b1000 EMC积分"
-      - "&a100 金币"
-      - "&b10 点券"
-    rewards:
-      - type: "command"
-        value: "alex give %player% 1000"
-      - type: "money"
-        value: 100
-      - type: "points"
-        value: 10
+# 支付完成后执行命令
+commands:
+  # 使用控制台执行 alinvite givedj 命令
+  - '[console]alinvite givedj %player_name% %points%'
+  
+  # 可选：给玩家发送成功消息
+  - '[message]&a充值成功！返点已自动处理'
+  - '[actionbar]&a返点处理完成'
 ```
 
-### 🎁 礼包商店配置
+### 📡 ALInviteAPI 接口
 
-| 礼包类型        | 价格             | 新玩家奖励                        |
-| ----------- | -------------- | ---------------------------- |
-| 🆓 **基础礼包** | 免费             | 50金币 + 64熟牛肉                 |
-| 📦 **普通礼包** | 500金币 + 50点券   | 16铁锭 + 32熟牛肉 + 50金币 + 5点券    |
-| 💎 **高级礼包** | 2000金币 + 200点券 | 10钻石 + 1附魔金苹果 + 300金币 + 30点券 |
+ALInvite 提供了完整的 API 接口，方便第三方插件集成。
 
-```yaml
-gift_shop:
-  enabled: true
-  gifts:
-    default:
-      name: "&6基础礼包"
-      price_money: 0
-      price_points: 0
-      rewards:
-        - type: "money"
-          value: 50
-        - type: "item"
-          value: "COOKED_BEEF 64"
+#### 核心 API 方法
+
+| 方法名称 | 描述 | 参数 | 返回值 |
+|---------|------|------|-------|
+| `getInviteCode()` | 获取玩家邀请码 | Player/UUID | CompletableFuture<String> |
+| `getTotalInvites()` | 获取玩家邀请总数 | Player/UUID | CompletableFuture<Integer> |
+| `getPurchasedGift()` | 获取玩家购买的礼包 | Player/UUID | CompletableFuture<String> |
+| `getActiveGift()` | 获取玩家当前活跃礼包 | Player/UUID | CompletableFuture<GiftConfig> |
+| `isSameIp()` | 检查两个玩家是否同IP | Player, Player | CompletableFuture<Boolean> |
+| `getInvitees()` | 获取被邀请玩家列表 | UUID | CompletableFuture<List<UUID>> |
+| `isPlayerBound()` | 检查玩家是否已绑定 | Player/UUID | CompletableFuture<Boolean> |
+| `getBindStatus()` | 获取玩家绑定状态 | Player/UUID | CompletableFuture<String> |
+| `getInviterName()` | 获取邀请人名称 | Player/UUID | CompletableFuture<String> |
+| `getInviterUuid()` | 获取邀请人UUID | Player/UUID | CompletableFuture<UUID> |
+| `resolvePlaceholders()` | 解析占位符 | String, Player | CompletableFuture<String> |
+| `registerInviteListener()` | 注册邀请成功监听器 | InviteSuccessListener | void |
+
+#### 点券充值返点 API
+
+| 方法名称 | 描述 | 参数 | 返回值 |
+|---------|------|------|-------|
+| `processPointsRecharge()` | 处理点券充值返点 | String, double | CompletableFuture<Boolean> |
+| `processPointsRecharge()` | 处理点券充值返点（带操作者信息） | String, String, double, boolean | CompletableFuture<Boolean> |
+| `getTotalRebateAmount()` | 获取玩家累计返点总额 | Player/UUID | CompletableFuture<Double> |
+| `checkRebateDuplicate()` | 检查跨服重复交易 | UUID, double | CompletableFuture<Boolean> |
+
+#### API 使用示例
+
+```java
+// 获取玩家邀请码
+ALInviteAPI.getInviteCode(player).thenAccept(code -> {
+    player.sendMessage("您的邀请码: " + code);
+});
+
+// 处理点券充值返点
+ALInviteAPI.processPointsRecharge("ThirdParty", "PlayerName", 100.0, false)
+    .thenAccept(success -> {
+        if (success) {
+            System.out.println("返点处理成功");
+        } else {
+            System.out.println("返点处理失败");
+        }
+    });
+
+// 注册邀请成功监听器
+ALInviteAPI.registerInviteListener((inviterUuid, inviteeUuid) -> {
+    Player inviter = Bukkit.getPlayer(inviterUuid);
+    Player invitee = Bukkit.getPlayer(inviteeUuid);
+    if (inviter != null && invitee != null) {
+        inviter.sendMessage("您成功邀请了 " + invitee.getName());
+    }
+});
 ```
 
-### 📢 全服公告设置
+#### 变量说明
 
-```yaml
-announcements:
-  enabled: true
-  mode: "BROADCAST"
-  cross_server_sync: true
-  messages:
-    default: "&6[邀请系统] &e{player} &a累计邀请人数达到 &6{total} &a人，获得里程碑 &6{milestone_name}&a！"
-```
+- `%player_name%` - 玩家名称
+- `%points%` - 充值点券数量
 
-## 🎮 功能详解
+#### 执行流程
 
-### 🔄 邀请流程
+1. 第三方插件执行 `[console]alinvite givedj 玩家名 金额`
+2. ALInvite 处理返点逻辑
+3. ALInvite 执行配置的点券发放命令
 
-#### 📋 完整邀请流程
+### ✅ 集成优势
 
-| 步骤              | 描述                | 详细说明                                                         |
-| --------------- | ----------------- | ------------------------------------------------------------ |
-| **1. 老玩家获取邀请码** | 老玩家通过菜单或命令获取专属邀请码 | - 老玩家输入 `/alinvite code` 获取邀请码- 系统生成唯一的6位邀请码- 邀请码永久有效，可重复使用  |
-| **2. 新玩家加入服务器** | 新玩家首次进入服务器        | - 新玩家首次登录服务器- **需要手动输入邀请码**                                  |
-| **3. 输入邀请码**    | 新玩家通过菜单或命令输入邀请码   | - 新玩家输入 `/alinvite` 打开主菜单绑定邀请码- 或通过GUI菜单输入邀请码- 系统验证邀请码格式和有效性 |
-| **4. 验证绑定**     | 系统验证邀请码并建立绑定关系    | - 检查邀请码是否存在- 验证IP限制（防止刷小号）- 建立新玩家与老玩家的绑定关系                   |
-| **5. 发放新玩家奖励**  | 新玩家获得礼包奖励         | - 根据老玩家购买的礼包类型发放奖励- 老玩家未购买时使用默认礼包- 奖励包括金币、点券、物品等             |
-| **6. 记录邀请关系**   | 老玩家邀请人数+1         | - 在老玩家记录中增加邀请人数- 更新邀请统计数据- 记录邀请时间戳                           |
-| **7. 检查里程碑**    | 检查老玩家是否达到里程碑      | - 检查当前邀请总数- 如果达到里程碑条件，发放奖励- 触发全服公告                           |
-| **8. 后续返点**     | 新玩家充值触发返点         | - 新玩家通过第三方插件充值- 系统自动计算返点比例- 老玩家获得返点奖励                        |
+- **简单稳定**：通过标准命令调用，避免复杂的API依赖
+- **兼容性好**：支持所有支持命令调用的第三方插件
+- **可控性强**：管理员可以明确控制集成方式
+- **无版本依赖**：无需担心插件版本兼容性问题
 
-#### ⚡ 快速开始
+## 🖥️ 菜单系统
 
-**老玩家操作：**
+### 🎯 菜单功能
 
-```bash
-/alinvite code          # 获取邀请码
-/alinvite stats         # 查看邀请统计
-/alinvite buygift       # 购买礼包
-```
+- **主菜单**：填写邀请码、查看邀请中心
+- **邀请中心**：查看邀请统计、领取里程碑奖励
+- **礼包商店**：购买不同等级的礼包
+- **返回导航**：支持返回主菜单的便捷导航
 
-**新玩家操作：**
+### ⚙️ 菜单配置
 
-```bash
-/alinvite               # 打开主菜单绑定邀请码
-/alinvite stats         # 查看邀请统计
-```
+菜单布局和按钮行为在 `menus.yml` 中配置，支持动态内容和状态显示。
 
-### 🎁 礼包系统
+## 🚀 性能优化
 
-| 礼包等级        | 购买条件    | 奖励内容 |
-| ----------- | ------- | ---- |
-| 📦 **基础礼包** | 免费      | 基础奖励 |
-| 📦 **普通礼包** | 金币+点券   | 中等奖励 |
-| 💎 **高级礼包** | 较多金币+点券 | 丰富奖励 |
+### ⚡ Folia多线程支持
 
-### 🏆 里程碑奖励
+- 完全支持Folia多线程服务器
+- 异步数据库操作，避免线程阻塞
+- 智能调度系统，提升响应速度
 
-| 里程碑        | 称号   | 奖励内容                            |
-| ---------- | ---- | ------------------------------- |
-| ⭐ **1人**   | 社交新星 | 1000 EMC积分 + 100金币 + 10点券       |
-| ✨ **5人**   | 社交达人 | 10000 EMC积分 + 500金币 + 50点券      |
-| 🔥 **10人** | 社交传奇 | 100000 EMC积分 + 10000金币 + 1000点券 |
+### 💾 数据库优化
 
-### 🔌 第三方集成
+- 使用HikariCP连接池
+- 自动创建数据库索引
+- 异步数据操作
 
-#### ⚡ LuckPerms 集成
+### 🔄 缓存系统
 
-当被邀请的玩家升级权限组时，邀请人可获得奖励。
+- 高性能Caffeine缓存
+- 智能缓存过期策略
+- 动态缓存大小调整
 
-#### 💰 充值返点系统
-
-支持第三方充值系统，当被邀请的玩家充值时，邀请人可获得返点。
-
-##### ⚡ 支持的充值插件
-
-| 充值插件                | 支持状态 | 说明         |
-| ------------------- | ---- | ---------- |
-| ✅ **MinePay**       | 完全支持 | 自动监听充值成功事件 |
-| ✅ **SweetCheckout** | 完全支持 | 自动监听充值成功事件 |
-| 🔄 **其他插件**         | 可扩展  | 通过事件监听器支持  |
-
-##### 🔧 返点权限组
-
-| 权限组      | 返点比例 | 权限节点                    |
-| -------- | ---- | ----------------------- |
-| **基础**   | 5%   | 无需权限（默认）                |
-| **VIP**  | 15%  | `alinvite.rebate.vip`   |
-| **SVIP** | 20%  | `alinvite.rebate.svip`  |
-| **MVIP** | 25%  | `alinvite.rebate.mvip`  |
-| **管理员**  | 0%   | `alinvite.rebate.admin` |
-
-##### 📋 返点规则
-
-| 充值金额   | 返点比例    | 说明             |
-| ------ | ------- | -------------- |
-| ≥ 10点券 | 5%      | 基础返点比例（所有玩家默认） |
-| ≥ 10点券 | 10%-25% | 根据权限组获得更高返点    |
-| < 10点券 | 0%      | 不触发返点          |
-
-##### 🔧 返点权限组
-
-| 权限组      | 返点比例 | 权限节点                    |
-| -------- | ---- | ----------------------- |
-| **基础**   | 5%   | 无需权限（默认）                |
-| **VIP**  | 15%  | `alinvite.rebate.vip`   |
-| **SVIP** | 20%  | `alinvite.rebate.svip`  |
-| **MVIP** | 25%  | `alinvite.rebate.mvip`  |
-| **管理员**  | 0%   | `alinvite.rebate.admin` |
-
-## 🔧 高级配置
-
-### 🚀 性能优化特性
-
-ALInvite 经过全面性能优化，特别针对高并发服务器环境进行了专门优化。
-
-#### ⚡ Folia多线程服务器支持
-
-| 优化项目       | 效果      | 说明              |
-| ---------- | ------- | --------------- |
-| ✅ **区域调度** | 避免线程阻塞  | 使用Folia区域调度器    |
-| ✅ **异步处理** | 提升响应速度  | 所有耗时操作异步执行      |
-| ✅ **智能检测** | 自动适配服务器 | 自动检测Folia/传统服务器 |
-
-#### 💾 数据库优化
-
-| 优化项目       | 效果        | 说明            |
-| ---------- | --------- | ------------- |
-| ✅ **自动索引** | 查询速度提升80% | 自动创建数据库索引     |
-| ✅ **连接池**  | 连接复用      | 使用HikariCP连接池 |
-| ✅ **异步操作** | 避免阻塞      | 所有数据库操作异步执行   |
-
-#### 🧠 缓存优化
-
-| 优化项目           | 效果     | 说明          |
-| -------------- | ------ | ----------- |
-| ✅ **动态缓存**     | 智能调整大小 | 根据服务器规模动态调整 |
-| ✅ **Caffeine** | 高性能缓存  | 使用业界领先的缓存库  |
-| ✅ **过期策略**     | 内存管理   | 自动清理过期缓存    |
-
-### 🎯 自定义奖励类型
-
-| 奖励类型        | 描述   | 示例                         |
-| ----------- | ---- | -------------------------- |
-| ⚡ `command` | 执行命令 | `give %player% diamond 10` |
-| 💰 `money`  | 发放金币 | `value: 100`               |
-| 🎫 `points` | 发放点券 | `value: 50`                |
-| 💎 `item`   | 发放物品 | `value: "DIAMOND 10"`      |
-
-### 💾 数据库配置
-
-| 数据库类型         | 配置       | 适用场景  |
-| ------------- | -------- | ----- |
-| 📱 **SQLite** | 轻量级，无需配置 | 单机服务器 |
-| 🌐 **MySQL**  | 支持多服务器   | 服务器集群 |
-
-```yaml
-database:
-  type: "sqlite"  # 或 "mysql"
-  # MySQL 配置（如果使用MySQL）
-  host: "localhost"
-  port: 3306
-  database: "minecraft"
-  username: "root"
-  password: "password"
-```
-
-### 🌐 跨服同步
-
-| 功能          | 配置                        | 说明       |
-| ----------- | ------------------------- | -------- |
-| 🔄 **跨服同步** | `cross_server_sync: true` | 多服务器环境同步 |
-| ⏱️ **同步间隔** | `sync_interval: 5`        | 同步频率（秒）  |
-
-## 🚨 故障排除
+## 🔧 故障排除
 
 ### ❓ 常见问题
 
@@ -362,25 +360,6 @@ database:
 debug: true
 ```
 
-## 🔌 API 接口
-
-插件提供完整的 API 接口，方便其他插件集成：
-
-```java
-// 获取插件实例
-ALInviteAPI api = ALInviteAPI.getInstance();
-
-// 注册邀请成功监听器
-api.registerInviteSuccessListener((inviter, invited) -> {
-    // 自定义逻辑
-});
-
-// 获取玩家邀请数据
-api.getPlayerData(playerUUID).thenAccept(data -> {
-    int totalInvites = data.getTotalInvites();
-});
-```
-
 ## 📞 技术支持
 
 如有问题或建议，请联系插件作者：
@@ -389,4 +368,11 @@ api.getPlayerData(playerUUID).thenAccept(data -> {
 - **QQ**：1422163791
 
 ***
+
+**插件特色：**
+
+- 🎯 智能邀请系统，促进服务器人口增长
+- 💰 完整的充值返点机制，激励玩家邀请
+- ⚡ Folia多线程兼容，高性能运行
+- 🔧 简单稳定的第三方集成方案
 

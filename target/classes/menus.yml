@@ -31,6 +31,7 @@ main_menu:
         - "&7领取累计奖励"
         - "&7你的邀请码: &e&n{invite_code}"  # {invite_code} = 玩家自己的邀请码
         - "&7累计获得返点: &e{total_rebate} 点券"  # {total_rebate} = 累计获得的充值返点数量
+        - "&7现金返点余额: &e{cash_rebate} 点券"  # {cash_rebate} = 现金返点余额（仅限有权限的玩家）
         - "&7邀请更多玩家领取里程碑奖励"
         - "&7未解锁请升级玩家等级&aLV.2"
       action: "OPEN_VETERAN"                # 打开邀请中心菜单
@@ -39,7 +40,7 @@ main_menu:
 veteran_menu:
   title: "&6&l邀请中心"
   shape:
-    - "####G####"                  # G = 当前礼包显示按钮
+    - "####G###A"                  # G = 当前礼包显示按钮
     - "#MMMMMMM#"                  # M = 里程碑进度按钮（可多格显示）
     - "B#######C"                  # B = 礼包商店按钮，C = 关闭按钮
   buttons:
@@ -125,6 +126,13 @@ veteran_menu:
             - "{reward_lore_1}"
             - "{reward_lore_2}"
             - "{reward_lore_3}"
+    A:                             # 返回主菜单按钮
+      material: "ARROW"
+      custom-model-data: 0
+      name: "&a返回主菜单"
+      lore:
+        - "&7点击返回主菜单"
+      action: "OPEN_MAIN"
     C:                             # 关闭按钮
       material: "BARRIER"
       custom-model-data: 0
@@ -137,7 +145,7 @@ veteran_menu:
 shop_menu:
   title: "&b&l礼包商店"
   shape:
-    - "#########"
+    - "########A"
     - "#GGGGGGG#"                  # G = 礼包按钮（可显示多个礼包）
     - "R#######C"                  # R = 返回按钮，C = 关闭按钮
   buttons:
@@ -183,6 +191,13 @@ shop_menu:
             - "{reward_lore_3}"
             - "{reward_lore_4}"
             - "{reward_lore_5}"
+    A:                             # 返回主菜单按钮
+      material: "ARROW"
+      custom-model-data: 0
+      name: "&a返回主菜单"
+      lore:
+        - "&7点击返回主菜单"
+      action: "OPEN_MAIN"
     R:                             # 返回按钮
       material: "ARROW"
       custom-model-data: 0

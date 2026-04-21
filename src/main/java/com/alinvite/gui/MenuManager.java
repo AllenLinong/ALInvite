@@ -574,14 +574,14 @@ public class MenuManager {
 
                     if (stateBtn != null) {
                         materialStr = stateBtn.material != null && !stateBtn.material.contains("{") ?
-                            stateBtn.material : gift.material;
+                            stateBtn.material : gift.material.name();
                         name = stateBtn.name != null && !stateBtn.name.contains("{") ?
                             stateBtn.name : gift.name;
                         lore = stateBtn.lore != null && !stateBtn.lore.isEmpty() ?
                             stateBtn.lore : btn.lore;
                         customModelData = stateBtn.customModelData;
                     } else {
-                        materialStr = gift.material;
+                        materialStr = gift.material.name();
                         name = gift.name;
                         lore = btn.lore;
                         customModelData = gift.customModelData;
@@ -692,7 +692,7 @@ public class MenuManager {
 
         ItemStack item;
         if (gift != null) {
-            item = new ItemStack(Material.valueOf(gift.material));
+            item = new ItemStack(gift.material);
             ItemMeta meta = item.getItemMeta();
             String name = plugin.getConfigManager().getMenusConfig().getString("shop_menu.buttons.W.name", "&e当前生效礼包: {name}");
             name = name.replace("{name}", gift.name);

@@ -88,7 +88,14 @@ public class PlaceholderResolver {
                 return placeholders;
             });
 
-        return CompletableFuture.allOf(codeFuture, bindFuture, inviterFuture, totalFuture, giftFuture, hasGiftFuture, nextMilestoneFuture, totalRebateFuture)
+        CompletableFuture<Map<String, String>> cashRebateFuture = getCashRebateAsync(uuid)
+            .thenApply(cashRebate -> {
+                placeholders.put("{cash_rebate}", cashRebate);
+                placeholders.put("%alinvite_cash_rebate%", cashRebate);
+                return placeholders;
+            });
+
+        return CompletableFuture.allOf(codeFuture, bindFuture, inviterFuture, totalFuture, giftFuture, hasGiftFuture, nextMilestoneFuture, totalRebateFuture, cashRebateFuture)
             .thenApply(v -> {
                 customReplacements.forEach((key, value) -> placeholders.put(key, value));
                 return placeholders;
@@ -134,6 +141,10 @@ public class PlaceholderResolver {
         String totalRebate = getTotalRebateSync(uuid);
         result = result.replace("{total_rebate}", totalRebate)
                      .replace("%alinvite_total_rebate%", totalRebate);
+
+        String cashRebate = getCashRebateSync(uuid);
+        result = result.replace("{cash_rebate}", cashRebate)
+                     .replace("%alinvite_cash_rebate%", cashRebate);
 
         for (Map.Entry<String, String> entry : customReplacements.entrySet()) {
             result = result.replace(entry.getKey(), entry.getValue());
@@ -311,6 +322,26 @@ public class PlaceholderResolver {
             return String.format("%.2f", totalRebate);
         } catch (Exception e) {
             plugin.getLogger().warning("获取累计返点总额失败: " + e.getMessage());
+            return "0.00";
+        }
+    }
+
+    public CompletableFuture<String> getCashRebateAsync(UUID uuid) {
+        return CompletableFuture.supplyAsync(() -> getCashRebateSync(uuid));
+    }
+
+    public String getCashRebateSync(UUID uuid) {
+        try {
+            // 从数据库获取现金返点金额
+            Double cashRebate = plugin.getDatabaseManager().getCashRebateAmount(uuid).join();
+            // 如果为null或NaN，返回0.00
+            if (cashRebate == null || cashRebate.isNaN()) {
+                return "0.00";
+            }
+            // 格式化显示，保留2位小数
+            return String.format("%.2f", cashRebate);
+        } catch (Exception e) {
+            plugin.getLogger().warning("获取现金返点金额失败: " + e.getMessage());
             return "0.00";
         }
     }

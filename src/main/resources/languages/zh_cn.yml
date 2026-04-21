@@ -28,12 +28,20 @@ commands:
       &e/alinvite admin addinvite <玩家> <数量> &7- 增加邀请次数
       &e/alinvite admin reset <玩家> &7- 重置玩家邀请数据
       &e/alinvite admin announce <玩家> <里程碑值> &7- 发送全服公告
+      &e/alinvite admin cashrebate <玩家> [金额] &7- 现金返点管理
+      &e/alinvite admin exchange <玩家> <金额> &7- 现金返点兑换
+      &e/alinvite givedj <玩家> <数量> &7- 为玩家充值点券
       &6============================
     givecode_success: "&a已为玩家 {player} 生成邀请码: {invite_code}"
     clearcode_success: "&a已清除玩家 {player} 的邀请码"
     addinvite_success: "&a已为玩家 {player} 增加 {amount} 邀请人数"
     reset_success: "&a已重置玩家 {player} 的邀请数据"
     announce_success: "&a已发送公告"
+    cash_rebate_deducted: "&a已扣除玩家 {player} 的现金返点: {amount} 点券"
+    cash_rebate_exchanged: "&a已兑换玩家 {player} 的现金返点: {amount} 点券已发放"
+    cash_rebate_exchange_failed: "&a已扣除玩家 {player} 的现金返点: {amount} 点券，但点券发放失败"
+    cash_rebate_player_exchanged: "&a您以花费现金返点: {amount}，兑换点券: {amount}点券"
+    cash_rebate_player_deducted: "&a您的现金返点已被扣除: {amount} 点券"
   help: |
     &6===== ALInvite 指令帮助 =====
     &e/alinvite &7- 打开邀请菜单
@@ -53,7 +61,8 @@ errors:
 
 
 points_rebate:
-  rebate_given: "&a您邀请的新人 &e{player}&a 充值了 &6{amount}&a 点券，您获得了 &e{rebate_amount}&a 点返点" 
+  rebate_given: "&a您邀请的新人 &e{player}&a 充值了 &6{amount}&a 点券，您获得了 &e{rebate_amount}&a 点返点"
+  cash_rebate_recorded: "&a您邀请的新人 &e{player}&a 充值了 &6{amount}&a 点券，您获得了 &e{rebate_amount}&a 点现金返点（已记录）"
 
 milestone:
   reached: "&a恭喜！你达到了 {name} 里程碑，获得奖励！"
@@ -76,3 +85,17 @@ dialog:
   fail: "&c邀请码无效"
   ip_limit: "&c你的 IP 已被其他玩家使用过邀请码"
   self_invite: "&c你不能使用自己的邀请码"
+
+function_restrictions:
+  # 绑定成功时的功能权限提示
+  bind_success_full: "&a✅ 绑定成功！你将获得所有功能权限"
+  bind_success_limited: "&a✅ 绑定成功！但由于同IP限制："
+  bind_success_milestone_enabled: "&7✅ 你的绑定将使老玩家解锁里程碑进度"
+  bind_success_milestone_disabled: "&7❌ 你的绑定将无法使老玩家解锁里程碑进度"
+  bind_success_rebate_enabled: "&7✅ 你的充值将使老玩家获得返点"
+  bind_success_rebate_disabled: "&7❌ 你的充值将无法使老玩家获得返点"
+  bind_success_gift_enabled: "&7✅ 你将获得新玩家礼包"
+  bind_success_gift_disabled: "&7❌ 你将无法获得新玩家礼包"
+  
+  # 绑定失败提示（IP限制启用时）
+  bind_failed_ip_restriction: "&c❌ 绑定失败！同IP绑定已被限制，请联系管理员"

@@ -2,7 +2,7 @@
 
 ## 📖 概述
 
-ALInvite 提供完整的 API 接口，支持第三方插件集成。通过 API 可以触发返点处理、查询邀请关系、管理邀请码等功能。
+ALInvite 提供 API 接口，支持通过命令调用方式集成。第三方插件可以通过执行 `alinvite givedj` 命令来触发返点处理。
 
 ## 🚀 快速开始
 
@@ -22,43 +22,34 @@ ALInvite plugin = (ALInvite) Bukkit.getPluginManager().getPlugin("ALInvite");
 ALInvite plugin = ALInviteAPI.getPlugin();
 ```
 
-## 🔌 API 方法详解
+## 🔌 第三方插件集成方式
 
-### 💰 点券充值返点 API
+### 💰 通过命令调用集成
 
-#### processPointsRecharge - 处理点券充值返点（第三方插件专用）
+ALInvite 支持通过命令调用方式与第三方插件集成。第三方插件可以在支付完成后执行 `alinvite givedj` 命令来触发返点处理。
 
-**方法签名：**
-```java
-public static CompletableFuture<Boolean> processPointsRecharge(
-    String targetPlayer, 
-    double amount
-)
+#### 配置示例
+
+在第三方插件的配置文件中添加：
+
+```yaml
+# 支付完成后执行命令
+commands:
+  # 使用控制台执行 alinvite givedj 命令
+  - '[console]alinvite givedj %player_name% %points%'
+  
+  # 可选：给玩家发送成功消息
+  - '[message]&a充值成功！返点已自动处理'
 ```
 
-**参数说明：**
-- `targetPlayer` - 目标玩家名称（接收点券的玩家）
-- `amount` - 充值点券数量
+#### 变量说明
+- `%player_name%` - 玩家名称
+- `%points%` - 充值点券数量
 
-**返回值：**
-- `CompletableFuture<Boolean>` - 处理结果，`true` 表示成功
-
-**使用示例：**
-```java
-// 第三方支付插件调用示例
-CompletableFuture<Boolean> result = ALInviteAPI.processPointsRecharge(
-    "Steve", 
-    1000.0
-);
-
-result.thenAccept(success -> {
-    if (success) {
-        getLogger().info("返点处理成功");
-    } else {
-        getLogger().warning("返点处理失败");
-    }
-});
-```
+#### 执行流程
+1. 第三方插件执行 `[console]alinvite givedj 玩家名 金额`
+2. ALInvite 处理返点逻辑
+3. ALInvite 执行配置的点券发放命令
 
 #### processPointsRecharge - 处理点券充值返点（完整版）
 

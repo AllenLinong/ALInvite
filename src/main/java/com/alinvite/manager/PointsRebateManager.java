@@ -210,9 +210,23 @@ public class PointsRebateManager {
             return true; // 没有邀请人，充值成功但无返点
         }
         
+        // 检查邀请人是否启用了返点功能
+        DatabaseManager.PlayerData inviterData = database.getPlayerData(inviterUuid).join();
+        if (inviterData != null && !inviterData.rebateEnabled) {
+            plugin.getLogger().info("邀请人 " + inviterUuid + " 返点功能被禁用，跳过返点");
+            return true; // 返点功能被禁用，充值成功但无返点
+        }
+        
         // 2. 获取返点比例 - 根据邀请人的权限组确定返点比例
         Player inviter = Bukkit.getPlayer(inviterUuid);
         double rebateRate = getRebateRate(inviter);
+        
+        // 检查是否为现金返点模式（负值表示现金模式）
+        boolean isCashRebateMode = (rebateRate < 0);
+        if (isCashRebateMode) {
+            rebateRate = -rebateRate; // 转换为正的比例值
+        }
+        
         double rebateAmount = amount * rebateRate;
         
         // 检查返点金额是否有效
@@ -227,8 +241,73 @@ public class PointsRebateManager {
             return true; // 超过上限，充值成功但无返点
         }
         
-        // 4. 发放返点 - 调用点券插件命令给邀请人发放返点
-        return giveRebatePoints(inviterUuid, rebateAmount, operator, targetPlayer, amount);
+        // 4. 根据模式发放返点
+        if (isCashRebateMode) {
+            // 现金返点模式：只记录不发放点券
+            return recordCashRebate(inviterUuid, rebateAmount, operator, targetPlayer, amount);
+        } else {
+            // 正常模式：发放点券返点
+            return giveRebatePoints(inviterUuid, rebateAmount, operator, targetPlayer, amount);
+        }
+    }
+    
+    /**
+     * 获取实际返点比例（忽略现金模式设置）
+     */
+    private double getActualRebateRate(Player player) {
+        if (player == null) {
+            return getDefaultRate();
+        }
+        
+        String permissionPrefix = plugin.getConfigManager().getConfig()
+            .getString("points_rebate.permission_prefix", "alinvite.rebate");
+        
+        String[] groups = {"cash_rebate", "admin", "mvip", "svip", "vip", "default"};
+        
+        for (String group : groups) {
+            String permission = permissionPrefix + "." + group;
+            if (player.hasPermission(permission)) {
+                String configPath = "points_rebate.rebate_rates." + group + ".rate";
+                return plugin.getConfigManager().getConfig().getDouble(configPath, 0.10);
+            }
+        }
+        
+        return getDefaultRate();
+    }
+    
+    /**
+     * 记录现金返点（不发放点券，只记录到数据库）
+     */
+    private boolean recordCashRebate(UUID playerUuid, double amount, String operator, String targetPlayer, double originalAmount) {
+        Player player = Bukkit.getPlayer(playerUuid);
+        if (player == null) {
+            plugin.getLogger().warning("邀请人不在线，无法记录现金返点: " + playerUuid);
+            return false;
+        }
+        
+        try {
+            // 更新数据库中的现金返点金额
+            boolean success = database.addCashRebateAmount(playerUuid, amount).join();
+            
+            if (success) {
+                plugin.getLogger().info("现金返点记录成功: " + player.getName() + " 获得 " + amount + " 点券（现金模式）");
+                
+                // 发送消息给玩家
+                String message = plugin.getConfigManager().getMessage("points_rebate.cash_rebate_recorded")
+                    .replace("{player}", targetPlayer)
+                    .replace("{amount}", String.valueOf((int)originalAmount))
+                    .replace("{rebate_amount}", String.valueOf((int)amount));
+                
+                player.sendMessage(message);
+                return true;
+            } else {
+                plugin.getLogger().warning("现金返点记录失败: " + player.getName());
+                return false;
+            }
+        } catch (Exception e) {
+            plugin.getLogger().severe("记录现金返点失败: " + e.getMessage());
+            return false;
+        }
     }
     
     /**
@@ -245,24 +324,53 @@ public class PointsRebateManager {
         String permissionPrefix = plugin.getConfigManager().getConfig()
             .getString("points_rebate.permission_prefix", "alinvite.rebate");
         
-        // 按权重从高到低检查权限（从权重最高的开始检查）
-        // 注意：base权限组是给所有玩家的默认返点，无需权限检查
-        String[] groups = {"admin", "mvip", "svip", "vip", "default"};
+        // 定义所有权限组及其配置路径
+        String[] groups = {"cash_rebate", "admin", "mvip", "svip", "vip", "default"};
         
-        // 先检查高权重权限组
+        // 按权重从高到低排序权限组
+        java.util.List<String> sortedGroups = new java.util.ArrayList<>();
+        java.util.Map<String, Integer> groupWeights = new java.util.HashMap<>();
+        
         for (String group : groups) {
+            String weightPath = "points_rebate.rebate_rates." + group + ".weight";
+            int weight = plugin.getConfigManager().getConfig().getInt(weightPath, 1);
+            groupWeights.put(group, weight);
+        }
+        
+        // 按权重从高到低排序
+        sortedGroups.addAll(java.util.Arrays.asList(groups));
+        sortedGroups.sort((g1, g2) -> {
+            int weight1 = groupWeights.get(g1);
+            int weight2 = groupWeights.get(g2);
+            return Integer.compare(weight2, weight1); // 降序排序
+        });
+        
+        plugin.getLogger().info("权限组权重排序结果: " + sortedGroups);
+        
+        // 按权重从高到低检查权限
+        for (String group : sortedGroups) {
             String permission = permissionPrefix + "." + group;
             if (player.hasPermission(permission)) {
                 // 获取该权限组的返点比例
                 String configPath = "points_rebate.rebate_rates." + group + ".rate";
                 double rate = plugin.getConfigManager().getConfig().getDouble(configPath, 0.10);
                 
+                // 检查是否为现金返点模式
+                String cashModePath = "points_rebate.rebate_rates." + group + ".cash_mode";
+                boolean isCashMode = plugin.getConfigManager().getConfig().getBoolean(cashModePath, false);
+                
                 // 获取权重值用于日志记录
                 String weightPath = "points_rebate.rebate_rates." + group + ".weight";
                 int weight = plugin.getConfigManager().getConfig().getInt(weightPath, 1);
                 
                 plugin.getLogger().info("玩家 " + player.getName() + " 拥有权限 " + permission + 
-                    " (权重: " + weight + ")，返点比例: " + (rate * 100) + "%");
+                    " (权重: " + weight + ", 现金模式: " + isCashMode + ")，返点比例: " + (rate * 100) + "%");
+                
+                // 如果是现金返点模式，返回实际比例（但标记为现金模式）
+                if (isCashMode) {
+                    // 返回负值表示现金返点模式，processRebate方法会处理
+                    return -rate; // 现金返点模式只记录不发放点券
+                }
                 
                 return rate;
             }

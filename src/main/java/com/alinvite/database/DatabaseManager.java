@@ -74,12 +74,16 @@ public class DatabaseManager {
                 `gift_id` VARCHAR(32),
                 `purchased_gifts` TEXT,
                 `money` REAL NOT NULL DEFAULT 0,
+                `cash_rebate_amount` REAL NOT NULL DEFAULT 0,
                 `last_invite_time` BIGINT,
                 `last_code_change` BIGINT,
                 `last_permission_group` VARCHAR(32),
                 `created_at` BIGINT NOT NULL
             )
             """;
+            
+        // 更新现有表结构（如果缺少字段）
+        updateTableStructure();
 
         String recordsTable = """
             CREATE TABLE IF NOT EXISTS `{prefix}records` (
@@ -180,6 +184,108 @@ public class DatabaseManager {
         
         plugin.getLogger().info("数据库索引创建完成！");
     }
+    
+    /**
+     * 更新现有表结构（添加缺失的字段）
+     */
+    private void updateTableStructure() {
+        String type = plugin.getConfigManager().getConfig().getString("database.type", "sqlite");
+        boolean isMySQL = type.equalsIgnoreCase("mysql");
+        
+        try {
+            // 检查 players 表是否缺少 cash_rebate_amount 字段
+            boolean columnExists = checkColumnExists("players", "cash_rebate_amount", isMySQL);
+            
+            if (!columnExists) {
+                // 添加缺失的字段
+                String alterTableSql = "ALTER TABLE " + tablePrefix + "players ADD COLUMN cash_rebate_amount REAL NOT NULL DEFAULT 0";
+                
+                // 对于MySQL，需要特殊处理
+                if (isMySQL) {
+                    alterTableSql = "ALTER TABLE " + tablePrefix + "players ADD COLUMN cash_rebate_amount DECIMAL(10,2) NOT NULL DEFAULT 0";
+                }
+                
+                executeUpdate(alterTableSql);
+                plugin.getLogger().info("已为数据库表添加 cash_rebate_amount 字段");
+            }
+            
+            // 检查 players 表是否缺少功能权限字段
+            boolean milestoneEnabledExists = checkColumnExists("players", "milestone_enabled", isMySQL);
+            boolean rebateEnabledExists = checkColumnExists("players", "rebate_enabled", isMySQL);
+            boolean giftEnabledExists = checkColumnExists("players", "gift_enabled", isMySQL);
+            boolean bindIpExists = checkColumnExists("players", "bind_ip", isMySQL);
+            
+            if (!milestoneEnabledExists) {
+                String alterSql = "ALTER TABLE " + tablePrefix + "players ADD COLUMN milestone_enabled BOOLEAN NOT NULL DEFAULT 1";
+                if (isMySQL) alterSql = "ALTER TABLE " + tablePrefix + "players ADD COLUMN milestone_enabled TINYINT(1) NOT NULL DEFAULT 1";
+                executeUpdate(alterSql);
+                plugin.getLogger().info("已为数据库表添加 milestone_enabled 字段");
+            }
+            
+            if (!rebateEnabledExists) {
+                String alterSql = "ALTER TABLE " + tablePrefix + "players ADD COLUMN rebate_enabled BOOLEAN NOT NULL DEFAULT 1";
+                if (isMySQL) alterSql = "ALTER TABLE " + tablePrefix + "players ADD COLUMN rebate_enabled TINYINT(1) NOT NULL DEFAULT 1";
+                executeUpdate(alterSql);
+                plugin.getLogger().info("已为数据库表添加 rebate_enabled 字段");
+            }
+            
+            if (!giftEnabledExists) {
+                String alterSql = "ALTER TABLE " + tablePrefix + "players ADD COLUMN gift_enabled BOOLEAN NOT NULL DEFAULT 1";
+                if (isMySQL) alterSql = "ALTER TABLE " + tablePrefix + "players ADD COLUMN gift_enabled TINYINT(1) NOT NULL DEFAULT 1";
+                executeUpdate(alterSql);
+                plugin.getLogger().info("已为数据库表添加 gift_enabled 字段");
+            }
+            
+            if (!bindIpExists) {
+                String alterSql = "ALTER TABLE " + tablePrefix + "players ADD COLUMN bind_ip VARCHAR(45)";
+                executeUpdate(alterSql);
+                plugin.getLogger().info("已为数据库表添加 bind_ip 字段");
+            }
+            
+        } catch (Exception e) {
+            plugin.getLogger().warning("更新数据库表结构失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 检查表中是否存在指定字段
+     */
+    private boolean checkColumnExists(String tableName, String columnName, boolean isMySQL) {
+        try {
+            String checkColumnSql;
+            if (isMySQL) {
+                checkColumnSql = "SELECT COUNT(*) FROM information_schema.COLUMNS " +
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
+            } else {
+                checkColumnSql = "PRAGMA table_info(\"" + tablePrefix + tableName + "\")";
+            }
+            
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(checkColumnSql)) {
+                
+                if (isMySQL) {
+                    stmt.setString(1, tablePrefix + tableName);
+                    stmt.setString(2, columnName);
+                    ResultSet rs = stmt.executeQuery();
+                    if (rs.next()) {
+                        return rs.getInt(1) > 0;
+                    }
+                } else {
+                    ResultSet rs = stmt.executeQuery();
+                    while (rs.next()) {
+                        String existingColumnName = rs.getString("name");
+                        if (columnName.equals(existingColumnName)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("检查字段是否存在失败: " + e.getMessage());
+        }
+        
+        return false;
+    }
 
     private int executeUpdate(String sql) {
         try (Connection conn = getConnection();
@@ -214,6 +320,9 @@ public class DatabaseManager {
                     data.lastCodeChange = rs.getLong("last_code_change");
                     data.lastPermissionGroup = rs.getString("last_permission_group");
                     data.createdAt = rs.getLong("created_at");
+                    data.milestoneEnabled = rs.getBoolean("milestone_enabled");
+                    data.rebateEnabled = rs.getBoolean("rebate_enabled");
+                    data.giftEnabled = rs.getBoolean("gift_enabled");
                     return data;
                 }
             } catch (SQLException e) {
@@ -925,6 +1034,27 @@ public class DatabaseManager {
         });
     }
 
+    /**
+     * 更新玩家功能权限
+     */
+    public CompletableFuture<Void> updateFunctionPermissions(UUID playerUuid, String bindIp, boolean milestoneEnabled, boolean rebateEnabled, boolean giftEnabled) {
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = "UPDATE " + tablePrefix + "players SET bind_ip = ?, milestone_enabled = ?, rebate_enabled = ?, gift_enabled = ? WHERE uuid = ?";
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, bindIp);
+                stmt.setBoolean(2, milestoneEnabled);
+                stmt.setBoolean(3, rebateEnabled);
+                stmt.setBoolean(4, giftEnabled);
+                stmt.setString(5, playerUuid.toString());
+                stmt.executeUpdate();
+            } catch (SQLException e) {
+                plugin.getLogger().severe("更新功能权限失败: " + e.getMessage());
+            }
+            return null;
+        });
+    }
+
     public CompletableFuture<Void> addInviteRecord(UUID inviterUuid, UUID inviteeUuid, String inviteeIp, String inviteeName) {
         return recordInvite(inviterUuid, inviteeUuid, inviteeIp, inviteeName);
     }
@@ -980,6 +1110,82 @@ public class DatabaseManager {
                 plugin.getLogger().severe("获取累计返点总额失败: " + e.getMessage());
             }
             return 0.0;
+        });
+    }
+
+    /**
+     * 获取玩家的现金返点金额
+     */
+    public CompletableFuture<Double> getCashRebateAmount(UUID uuid) {
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = "SELECT cash_rebate_amount FROM " + tablePrefix + "players WHERE uuid = ?";
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, uuid.toString());
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    return rs.getDouble("cash_rebate_amount");
+                }
+            } catch (SQLException e) {
+                plugin.getLogger().severe("获取现金返点金额失败: " + e.getMessage());
+            }
+            return 0.0;
+        });
+    }
+    
+    /**
+     * 增加现金返点金额
+     */
+    public CompletableFuture<Boolean> addCashRebateAmount(UUID uuid, double amount) {
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = "UPDATE " + tablePrefix + "players SET cash_rebate_amount = cash_rebate_amount + ? WHERE uuid = ?";
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setDouble(1, amount);
+                stmt.setString(2, uuid.toString());
+                int rows = stmt.executeUpdate();
+                return rows > 0;
+            } catch (SQLException e) {
+                plugin.getLogger().severe("增加现金返点金额失败: " + e.getMessage());
+                return false;
+            }
+        });
+    }
+    
+    /**
+     * 扣除现金返点金额
+     */
+    public CompletableFuture<Boolean> deductCashRebateAmount(UUID uuid, double amount) {
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = "UPDATE " + tablePrefix + "players SET cash_rebate_amount = cash_rebate_amount - ? WHERE uuid = ? AND cash_rebate_amount >= ?";
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setDouble(1, amount);
+                stmt.setString(2, uuid.toString());
+                stmt.setDouble(3, amount);
+                int rows = stmt.executeUpdate();
+                return rows > 0;
+            } catch (SQLException e) {
+                plugin.getLogger().severe("扣除现金返点金额失败: " + e.getMessage());
+                return false;
+            }
+        });
+    }
+
+    public CompletableFuture<Boolean> deductPoints(UUID uuid, int points) {
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = "UPDATE " + tablePrefix + "players SET money = money - ? WHERE uuid = ? AND money >= ?";
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setDouble(1, points);
+                stmt.setString(2, uuid.toString());
+                stmt.setDouble(3, points);
+                int rows = stmt.executeUpdate();
+                return rows > 0;
+            } catch (SQLException e) {
+                plugin.getLogger().severe("扣除点券失败: " + e.getMessage());
+                return false;
+            }
         });
     }
 
@@ -1138,6 +1344,9 @@ public class DatabaseManager {
         public long lastCodeChange;
         public String lastPermissionGroup;
         public long createdAt;
+        public boolean milestoneEnabled;
+        public boolean rebateEnabled;
+        public boolean giftEnabled;
     }
 
     public static class Announcement {

@@ -2,6 +2,7 @@ package com.alinvite.commands;
 
 import com.alinvite.ALInvite;
 import com.alinvite.config.ConfigManager;
+import com.alinvite.utils.SchedulerUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -42,6 +43,7 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
         switch (subCommand) {
             case "code" -> handleCode(sender);
             case "stats" -> handleStats(sender);
+            case "cashrebate" -> handleCashRebate(sender);
             case "buygift" -> handleBuyGift(sender);
             case "help" -> handleHelp(sender);
             case "admin" -> handleAdmin(sender, args);
@@ -198,6 +200,123 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
                     .replace("{player}", args[2]);
                 sender.sendMessage(msg);
             }
+            case "cashrebate" -> {
+                if (args.length < 3) {
+                    sender.sendMessage("用法: /alinvite admin cashrebate <玩家> [扣除金额]");
+                    return;
+                }
+                
+                Player target = Bukkit.getPlayer(args[2]);
+                if (target == null) {
+                    sender.sendMessage("玩家不存在或不在线");
+                    return;
+                }
+                
+                if (args.length == 3) {
+                    // 查询现金返点
+                    plugin.getDatabaseManager().getCashRebateAmount(target.getUniqueId()).thenAccept(amount -> {
+                        String message = "§a玩家 " + target.getName() + " 的现金返点余额: §e" + amount + " §a点券";
+                        sender.sendMessage(message);
+                    });
+                } else {
+                    // 扣除现金返点
+                    double deductAmount;
+                    try {
+                        deductAmount = Double.parseDouble(args[3]);
+                        if (deductAmount <= 0) {
+                            sender.sendMessage("扣除金额必须大于0");
+                            return;
+                        }
+                    } catch (NumberFormatException e) {
+                        sender.sendMessage("扣除金额必须是数字");
+                        return;
+                    }
+                    
+                    plugin.getDatabaseManager().deductCashRebateAmount(target.getUniqueId(), deductAmount).thenAccept(success -> {
+                        if (success) {
+                            String message = plugin.getConfigManager().getMessage("commands.admin.cash_rebate_deducted")
+                                .replace("{player}", target.getName())
+                                .replace("{amount}", String.valueOf((int)deductAmount));
+                            sender.sendMessage(message);
+                            
+                            // 发送消息给玩家
+                            String playerMsg = plugin.getConfigManager().getMessage("commands.admin.cash_rebate_player_deducted")
+                                .replace("{amount}", String.valueOf((int)deductAmount));
+                            target.sendMessage(playerMsg);
+                        } else {
+                            sender.sendMessage("§c扣除失败: 玩家现金返点余额不足");
+                        }
+                    });
+                }
+            }
+            case "exchange" -> {
+                if (args.length < 4) {
+                    sender.sendMessage("用法: /alinvite admin exchange <玩家> <兑换金额>");
+                    return;
+                }
+                
+                Player target = Bukkit.getPlayer(args[2]);
+                if (target == null) {
+                    sender.sendMessage("玩家不存在或不在线");
+                    return;
+                }
+                
+                double exchangeAmount;
+                try {
+                    exchangeAmount = Double.parseDouble(args[3]);
+                    if (exchangeAmount <= 0) {
+                        sender.sendMessage("兑换金额必须大于0");
+                        return;
+                    }
+                } catch (NumberFormatException e) {
+                    sender.sendMessage("兑换金额必须是数字");
+                    return;
+                }
+                
+                // 先扣除现金返点
+                plugin.getDatabaseManager().deductCashRebateAmount(target.getUniqueId(), exchangeAmount).thenAccept(success -> {
+                    if (success) {
+                        // 扣除成功，自动发放等额点券（必须在主线程中执行）
+                        String pointsCommand = plugin.getConfigManager().getConfig()
+                            .getString("points_rebate.points_command", "points give {player} {amount}")
+                            .replace("{player}", target.getName())
+                            .replace("{amount}", String.valueOf((int)exchangeAmount));
+                        
+                        final String finalPointsCommand = pointsCommand;
+                        plugin.getLogger().info("执行兑换命令: " + finalPointsCommand);
+                        
+                        SchedulerUtils.runTask(plugin, () -> {
+                            boolean pointsSuccess = Bukkit.dispatchCommand(Bukkit.getConsoleSender(), finalPointsCommand);
+                            
+                            if (pointsSuccess) {
+                                plugin.getLogger().info("点券发放成功: " + target.getName() + " 获得 " + exchangeAmount + " 点券");
+                                String message = plugin.getConfigManager().getMessage("commands.admin.cash_rebate_exchanged")
+                                    .replace("{player}", target.getName())
+                                    .replace("{amount}", String.valueOf((int)exchangeAmount));
+                                sender.sendMessage(message);
+                                
+                                // 发送消息给玩家
+                                String playerMsg = plugin.getConfigManager().getMessage("commands.admin.cash_rebate_player_exchanged")
+                                    .replace("{amount}", String.valueOf((int)exchangeAmount));
+                                target.sendMessage(playerMsg);
+                            } else {
+                                plugin.getLogger().warning("点券发放失败: " + finalPointsCommand);
+                                String message = plugin.getConfigManager().getMessage("commands.admin.cash_rebate_exchange_failed")
+                                    .replace("{player}", target.getName())
+                                    .replace("{amount}", String.valueOf((int)exchangeAmount));
+                                sender.sendMessage(message);
+                                sender.sendMessage("§c请手动发放点券: " + finalPointsCommand);
+                                
+                                // 发送消息给玩家
+                                String playerMsg = "§c现金返点兑换失败，请联系管理员";
+                                target.sendMessage(playerMsg);
+                            }
+                        });
+                    } else {
+                        sender.sendMessage("§c兑换失败: 玩家现金返点余额不足");
+                    }
+                });
+            }
             case "addinvite" -> {
                 if (args.length < 4) {
                     sender.sendMessage("用法: /alinvite admin addinvite <玩家> <数量>");
@@ -292,7 +411,7 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
                     sender.sendMessage("玩家不存在或不在线");
                     return;
                 }
-                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                SchedulerUtils.runTask(plugin, () -> {
                     plugin.getPermissionGroupRewardListener().manualCheck(target);
                     sender.sendMessage("已为玩家 " + target.getName() + " 检查权限组奖励");
                 });
@@ -428,5 +547,35 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
                     sender.sendMessage("充值失败，请检查玩家名称和金额");
                 }
             });
+    }
+    
+    /**
+     * 处理玩家查询现金返点
+     */
+    private void handleCashRebate(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(plugin.getConfigManager().getMessage("errors.player_only"));
+            return;
+        }
+        
+        if (!player.hasPermission("alinvite.use")) {
+            player.sendMessage(plugin.getConfigManager().getMessage("errors.no_permission"));
+            return;
+        }
+        
+        // 检查是否拥有现金返点权限
+        String cashPermission = plugin.getConfigManager().getConfig()
+            .getString("cash_rebate.permission", "alinvite.rebate.cash");
+        
+        if (!player.hasPermission(cashPermission)) {
+            player.sendMessage("§c您没有现金返点权限");
+            return;
+        }
+        
+        plugin.getDatabaseManager().getCashRebateAmount(player.getUniqueId()).thenAccept(amount -> {
+            String message = "§a您的现金返点余额: §e" + amount + " §a点券";
+            player.sendMessage(message);
+            player.sendMessage("§7提示: 现金返点用于后期兑换，不会自动发放点券");
+        });
     }
 }

@@ -36,6 +36,9 @@ public class ConfigManager {
             plugin.saveResource("config.yml", false);
         }
         config = YamlConfiguration.loadConfiguration(configFile);
+        
+        // 自动更新缺失的配置项
+        updateMissingConfigs();
     }
 
     private void loadMenus() {
@@ -44,6 +47,9 @@ public class ConfigManager {
             plugin.saveResource("menus.yml", false);
         }
         menusConfig = YamlConfiguration.loadConfiguration(menusFile);
+        
+        // 自动更新缺失的菜单配置项
+        updateMissingMenus();
     }
 
     private void loadLang() {
@@ -68,6 +74,147 @@ public class ConfigManager {
         }
 
         langConfig = YamlConfiguration.loadConfiguration(langFile);
+        
+        // 自动更新缺失的语言配置项
+        updateMissingLang();
+    }
+
+    /**
+     * 自动更新缺失的菜单配置项
+     */
+    private void updateMissingMenus() {
+        boolean menusUpdated = false;
+        
+        try {
+            // 获取默认菜单配置（从jar包中的原始配置）
+            FileConfiguration defaultMenus = YamlConfiguration.loadConfiguration(
+                new java.io.InputStreamReader(
+                    plugin.getResource("menus.yml"), 
+                    java.nio.charset.StandardCharsets.UTF_8
+                )
+            );
+            
+            // 检查并添加缺失的菜单配置项
+            menusUpdated |= updateConfigSection(defaultMenus, menusConfig, "main_menu");
+            menusUpdated |= updateConfigSection(defaultMenus, menusConfig, "gift_shop");
+            menusUpdated |= updateConfigSection(defaultMenus, menusConfig, "milestone_rewards");
+            
+            // 如果菜单配置有更新，保存文件
+            if (menusUpdated) {
+                try {
+                    menusConfig.save(menusFile);
+                    plugin.getLogger().info("已自动更新菜单配置文件，添加了缺失的配置项");
+                } catch (IOException e) {
+                    plugin.getLogger().warning("无法保存更新的菜单配置文件: " + e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("无法加载默认菜单配置: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 自动更新缺失的语言配置项
+     */
+    private void updateMissingLang() {
+        boolean langUpdated = false;
+        
+        try {
+            // 获取默认语言配置（从jar包中的原始配置）
+            FileConfiguration defaultLang = YamlConfiguration.loadConfiguration(
+                new java.io.InputStreamReader(
+                    plugin.getResource("languages/zh_cn.yml"), 
+                    java.nio.charset.StandardCharsets.UTF_8
+                )
+            );
+            
+            // 检查并添加缺失的语言配置项
+            langUpdated |= updateConfigSection(defaultLang, langConfig, "commands.admin.cash_rebate_deducted");
+            langUpdated |= updateConfigSection(defaultLang, langConfig, "commands.admin.cash_rebate_exchanged");
+            langUpdated |= updateConfigSection(defaultLang, langConfig, "commands.admin.cash_rebate_exchange_failed");
+            langUpdated |= updateConfigSection(defaultLang, langConfig, "points_rebate.cash_rebate_recorded");
+            
+            // 如果语言配置有更新，保存文件
+            if (langUpdated) {
+                try {
+                    langConfig.save(langFile);
+                    plugin.getLogger().info("已自动更新语言配置文件，添加了缺失的配置项");
+                } catch (IOException e) {
+                    plugin.getLogger().warning("无法保存更新的语言配置文件: " + e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("无法加载默认语言配置: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 自动更新缺失的配置项
+     * 只添加缺失的配置，不会修改用户已设置的配置
+     */
+    private void updateMissingConfigs() {
+        boolean configUpdated = false;
+        
+        // 获取默认配置（从jar包中的原始配置）
+        FileConfiguration defaultConfig = YamlConfiguration.loadConfiguration(
+            new java.io.InputStreamReader(
+                plugin.getResource("config.yml"), 
+                java.nio.charset.StandardCharsets.UTF_8
+            )
+        );
+        
+        // 检查并添加缺失的配置项
+        configUpdated |= updateConfigSection(defaultConfig, config, "points_rebate.rebate_rates.cash_rebate");
+        configUpdated |= updateConfigSection(defaultConfig, config, "points_rebate.points_command");
+        configUpdated |= updateConfigSection(defaultConfig, config, "language");
+        configUpdated |= updateConfigSection(defaultConfig, config, "database");
+        configUpdated |= updateConfigSection(defaultConfig, config, "milestones");
+        configUpdated |= updateConfigSection(defaultConfig, config, "gifts");
+        
+        // 如果配置有更新，保存文件
+        if (configUpdated) {
+            try {
+                config.save(configFile);
+                plugin.getLogger().info("已自动更新配置文件，添加了缺失的配置项");
+            } catch (IOException e) {
+                plugin.getLogger().warning("无法保存更新的配置文件: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * 更新配置节，只添加缺失的配置项
+     */
+    private boolean updateConfigSection(FileConfiguration defaultConfig, FileConfiguration currentConfig, String path) {
+        boolean updated = false;
+        
+        // 如果当前配置中不存在该路径，则从默认配置复制
+        if (!currentConfig.contains(path)) {
+            Object defaultValue = defaultConfig.get(path);
+            if (defaultValue != null) {
+                currentConfig.set(path, defaultValue);
+                plugin.getLogger().info("添加缺失配置项: " + path);
+                updated = true;
+            }
+        } else if (currentConfig.isConfigurationSection(path)) {
+            // 如果是配置节，递归检查子项
+            org.bukkit.configuration.ConfigurationSection defaultSection = defaultConfig.getConfigurationSection(path);
+            org.bukkit.configuration.ConfigurationSection currentSection = currentConfig.getConfigurationSection(path);
+            
+            if (defaultSection != null && currentSection != null) {
+                for (String key : defaultSection.getKeys(true)) {
+                    String fullKey = path + "." + key;
+                    if (!currentConfig.contains(fullKey)) {
+                        Object defaultValue = defaultConfig.get(fullKey);
+                        currentConfig.set(fullKey, defaultValue);
+                        plugin.getLogger().info("添加缺失配置项: " + fullKey);
+                        updated = true;
+                    }
+                }
+            }
+        }
+        
+        return updated;
     }
 
     public void saveConfig() {

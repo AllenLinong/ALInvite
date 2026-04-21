@@ -164,6 +164,7 @@ public class MenuListener implements Listener {
 
         switch (action) {
             case "OPEN_SHOP" -> plugin.getMenuManager().openShopMenu(player);
+            case "OPEN_MAIN" -> plugin.getMenuManager().openMainMenu(player);
             case "CLOSE" -> player.closeInventory();
             case "CLAIM_MILESTONE" -> handleClaimMilestone(player, slot);
         }
@@ -256,6 +257,7 @@ public class MenuListener implements Listener {
 
         switch (action) {
             case "BACK_TO_VETERAN" -> plugin.getMenuManager().openVeteranMenu(player);
+            case "OPEN_MAIN" -> plugin.getMenuManager().openMainMenu(player);
             case "CLOSE" -> player.closeInventory();
             case "BUY_GIFT" -> handleBuyGift(player, slot);
         }

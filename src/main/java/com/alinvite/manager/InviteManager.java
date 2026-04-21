@@ -239,13 +239,8 @@ public class InviteManager {
                     }
                     
                     return plugin.getDatabaseManager().getIpInviteCount(playerIp).thenCompose(currentCount -> {
-                        if (plugin.getConfigManager().getConfig().getBoolean("ip_restriction.enabled", true)) {
-                            int maxInvites = plugin.getConfigManager().getConfig().getInt("ip_restriction.max_invites_per_ip", 1);
-                            if (maxInvites > 0 && currentCount >= maxInvites) {
-                                return CompletableFuture.completedFuture(new BindResult(false, BindResultType.IP_LIMIT));
-                            }
-                        }
-                        return CompletableFuture.completedFuture(null);
+                        // 检测同IP绑定顺序并设置功能权限
+                        return determineFunctionPermissions(playerUuid, playerIp, currentCount);
                     })
                     .thenCompose(result2 -> {
                         if (result2 != null) return CompletableFuture.completedFuture(result2);
@@ -325,5 +320,66 @@ public class InviteManager {
             this.type = type;
             this.inviterUuid = inviterUuid;
         }
+    }
+
+    /**
+     * 检测同IP绑定顺序并设置功能权限
+     */
+    private CompletableFuture<BindResult> determineFunctionPermissions(UUID playerUuid, String playerIp, int currentCount) {
+        Player player = Bukkit.getPlayer(playerUuid);
+        
+        // 如果IP限制启用（enabled=true），则完全禁止同IP绑定
+        if (plugin.getConfigManager().getConfig().getBoolean("ip_restriction.enabled", false)) {
+            if (currentCount > 0) {
+                if (player != null) {
+                    player.sendMessage(plugin.getConfigManager().getMessage("function_restrictions.bind_failed_ip_restriction"));
+                }
+                return CompletableFuture.completedFuture(new BindResult(false, BindResultType.SELF_INVITE));
+            }
+            // 第一个绑定，设置所有功能为启用
+            if (player != null) {
+                player.sendMessage(plugin.getConfigManager().getMessage("function_restrictions.bind_success_full"));
+            }
+            return plugin.getDatabaseManager().updateFunctionPermissions(playerUuid, playerIp, true, true, true)
+                .thenApply(v -> null);
+        }
+        
+        // 如果IP限制未启用（enabled=false），则允许同IP绑定，但所有同IP绑定都根据配置限制功能
+        boolean milestoneEnabled = plugin.getConfigManager().getConfig().getBoolean("ip_restriction.flexible_mode.milestone", false);
+        boolean rebateEnabled = plugin.getConfigManager().getConfig().getBoolean("ip_restriction.flexible_mode.rebate", true);
+        boolean giftEnabled = plugin.getConfigManager().getConfig().getBoolean("ip_restriction.flexible_mode.gift", false);
+
+        // 发送功能权限提示
+        if (player != null) {
+            if (milestoneEnabled && rebateEnabled && giftEnabled) {
+                player.sendMessage(plugin.getConfigManager().getMessage("function_restrictions.bind_success_full"));
+            } else {
+                // 根据实际配置生成动态提示消息
+                StringBuilder message = new StringBuilder(plugin.getConfigManager().getMessage("function_restrictions.bind_success_limited") + "\n");
+                
+                if (milestoneEnabled) {
+                    message.append(plugin.getConfigManager().getMessage("function_restrictions.bind_success_milestone_enabled") + "\n");
+                } else {
+                    message.append(plugin.getConfigManager().getMessage("function_restrictions.bind_success_milestone_disabled") + "\n");
+                }
+                
+                if (rebateEnabled) {
+                    message.append(plugin.getConfigManager().getMessage("function_restrictions.bind_success_rebate_enabled") + "\n");
+                } else {
+                    message.append(plugin.getConfigManager().getMessage("function_restrictions.bind_success_rebate_disabled") + "\n");
+                }
+                
+                if (giftEnabled) {
+                    message.append(plugin.getConfigManager().getMessage("function_restrictions.bind_success_gift_enabled") + "\n");
+                } else {
+                    message.append(plugin.getConfigManager().getMessage("function_restrictions.bind_success_gift_disabled") + "\n");
+                }
+                
+                player.sendMessage(message.toString());
+            }
+        }
+
+        return plugin.getDatabaseManager().updateFunctionPermissions(playerUuid, playerIp, milestoneEnabled, rebateEnabled, giftEnabled)
+            .thenApply(v -> null);
     }
 }

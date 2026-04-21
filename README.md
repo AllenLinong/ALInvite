@@ -1,316 +1,392 @@
-# ALInvite 邀请系统插件完整使用指南
+# 🎯 ALInvite - 我的世界服务器邀请系统插件
 
-## 📌 插件简介
+## 📖 概述
 
-**ALInvite** 是一款功能强大的 Minecraft 服务器邀请系统插件，支持邀请码绑定、新人礼包、累计里程碑奖励、权限组奖励等功能。适用于 Spigot/Paper 1.21+ 服务器。
+**ALInvite** 是一个功能强大的我的世界服务器邀请系统插件，旨在通过激励玩家邀请新玩家加入服务器，促进服务器人口增长和社区活跃度。插件支持多语言、自定义菜单、礼包商店、里程碑奖励等丰富功能。
 
-### 特性
+### ✨ 主要特性
 
-- 🎁 **邀请码系统** - 自动生成唯一邀请码，支持自定义格式
-- 📦 **礼包商店** - 老玩家可购买礼包，提升新人奖励
-- 🏆 **里程碑奖励** - 累计邀请人数达到 milestones 时发放额外奖励
-- 👑 **权限组奖励** - 新人加入权限组时，自动奖励邀请人
-- 🔗 **跨服同步** - 支持多服务器集群数据同步（公告同步已修复）
-- 💰 **经济集成** - 支持 Vault、PlayerPoints 等多种经济插件
-- 🔌 **开放 API** - 提供完整 API，支持第三方插件联动
+| 功能模块           | 描述                |
+| -------------- | ----------------- |
+| 🔑 **智能邀请码系统** | 每个老玩家拥有独立的邀请码     |
+| 🎁 **礼包商店**    | 老玩家可购买不同等级的礼包     |
+| 🏆 **里程碑系统**   | 累计邀请达到指定人数时发放额外奖励 |
+| 📢 **全服公告**    | 里程碑达成时自动全服广播      |
+| 🛡️ **IP限制**   | 防止刷小号和作弊行为        |
+| 🌐 **多语言支持**   | 内置中文和英文语言包        |
+| 🖥️ **GUI菜单**  | 直观易用的图形界面         |
+| ⚡ **权限组奖励**    | 与LuckPerms等权限插件集成 |
+| 💰 **第三方充值返点** | 支持第三方充值系统的返点功能    |
+| ⚡ **Folia兼容性** | 完全支持Folia多线程服务器   |
+| 🚀 **性能优化**    | 数据库索引、缓存、异步处理优化   |
 
-***
+## 🚀 安装指南
 
-## 📥 安装说明
+### 📋 前置要求
 
-### 支持的服务端核心
+| 项目                  | 要求           |
+| ------------------- | ------------ |
+| **Minecraft 服务器版本** | 1.20.4+      |
+| **Java 版本**         | **21+**      |
+| **服务器类型**           | 支持 Folia（推荐） |
 
-| 核心         | 版本                      | 支持情况           |
-| ---------- | ----------------------- | -------------- |
-| **Paper**  | 1.20.x - 26.x (1.21.11) | ✅ 完全支持         |
-| **Spigot** | 1.20.4 - 1.21.x         | ✅ 完全支持         |
-| **Folia**  | 1.20.4 - 1.21.x         | ✅ 支持 (自动检测调度器) |
+### 📦 安装步骤
 
-> **注意**: 本插件最低要求 Java 21，推荐使用 Paper 或 Folia 服务端以获得最佳性能和兼容性。
+1. 📥 将 `ALInvite-1.0.6-shaded.jar` 文件放入服务器的 `plugins` 文件夹
+2. 🔄 重启服务器
+3. ⚙️ 插件会自动生成配置文件
+4. ✏️ 根据需要修改配置文件
+5. 🔄 重新加载配置或重启服务器
 
-### 环境要求
+### ⚡ 服务器类型支持
 
-- **服务端**: Spigot / Paper / Folia 1.20.4 - 1.21.x
-- **Java**: JDK 21 或更高版本
-- **依赖插件** (可选):
-  - Vault + 经济插件 (用于金币奖励)
-  - PlayerPoints (用于点券奖励)
-  - PlaceholderAPI (用于变量替换)
-  - LuckPerms (用于实时权限检测)
+| 服务器类型        | 支持状态 | 性能表现    |
+| ------------ | ---- | ------- |
+| ✅ **Folia**  | 完全支持 | 🚀 最佳性能 |
+| ✅ **Paper**  | 完全支持 | ⚡ 优秀性能  |
+| ✅ **Spigot** | 完全支持 | 👍 良好性能 |
+| ✅ **Bukkit** | 完全支持 | 👍 良好性能 |
 
-### 安装步骤
+## 🔐 权限系统
 
-1. 下载 `ALInvite-1.0.5.jar`
-2. 将 jar 文件放入服务器 `plugins` 文件夹
-3. 启动服务器生成默认配置
-4. 根据需求修改 `config.yml` 和 `languages` 文件
-5. 使用 `/alinvite reload` 重载配置
+### 📊 基础权限表
 
-***
+| 权限节点                  | 描述           | 默认值    |
+| --------------------- | ------------ | ------ |
+| ✅ `alinvite.use`      | 使用主命令和查看菜单   | `true` |
+| 🎁 `alinvite.buygift` | 允许购买礼包       | `true` |
+| 👑 `alinvite.admin`   | 管理员权限        | `op`   |
+| 🔑 `alinvite.veteran` | 老玩家权限（拥有邀请码） | 无      |
 
-## ⚙️ 配置文件说明
-
-### config.yml 主要配置
+### ⚙️ 权限组设置示例
 
 ```yaml
-# ========== 邀请码设置 ==========
+# 使用 LuckPerms 设置权限组
+/lp group default permission set alinvite.use
+/lp group vip permission set alinvite.veteran
+/lp group vip permission set alinvite.buygift
+```
+
+## ⌨️ 命令使用
+
+### 👤 玩家命令表
+
+| 命令                     | 描述        | 权限                                  |
+| ---------------------- | --------- | ----------------------------------- |
+| 🖥️ `/alinvite`        | 打开邀请系统主菜单 | `alinvite.use`                      |
+| 🔑 `/alinvite code`    | 查看自己的邀请码  | `alinvite.use` + `alinvite.veteran` |
+| 📊 `/alinvite stats`   | 查看邀请统计信息  | `alinvite.use`                      |
+| 🎁 `/alinvite buygift` | 打开礼包商店    | `alinvite.buygift`                  |
+| ❓ `/alinvite help`     | 查看帮助信息    | `alinvite.use`                      |
+
+### 👑 管理员命令表
+
+| 命令                                        | 描述       | 权限               |
+| ----------------------------------------- | -------- | ---------------- |
+| ❓ `/alinvite admin help`                  | 显示管理帮助   | `alinvite.admin` |
+| 🔄 `/alinvite admin reload`               | 重载插件配置   | `alinvite.admin` |
+| 🔑 `/alinvite admin givecode <玩家>`        | 为玩家生成邀请码 | `alinvite.admin` |
+| 🗑️ `/alinvite admin clearcode <玩家>`      | 清除玩家邀请码  | `alinvite.admin` |
+| ➕ `/alinvite admin addinvite <玩家> <数量>`   | 增加玩家邀请次数 | `alinvite.admin` |
+| 🔄 `/alinvite admin reset <玩家>`           | 重置玩家邀请数据 | `alinvite.admin` |
+| 📢 `/alinvite admin announce <玩家> <里程碑值>` | 发送全服公告   | `alinvite.admin` |
+| 👥 `/alinvite admin checkgroup <玩家>`      | 检查权限组奖励  | `alinvite.admin` |
+| 💰 `/alinvite givedj <玩家> <数量>`           | 为玩家充值点券  | `alinvite.admin` |
+
+## ⚙️ 配置文件详解
+
+### 🌐 语言设置
+
+```yaml
+language:
+  locale: "zh_cn"  # 语言文件标识
+```
+
+### 🔑 邀请码设置
+
+```yaml
 invite_code:
-  length: 6                      # 邀请码长度 (4-8位)
-  charset: "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789"  # 字符集
-  prefix: ""                     # 邀请码前缀 (如 "AL-" 生成 "AL-ABC123")
-  veteran_permission: "alinvite.veteran"   # 老玩家权限节点
-  use_permission: "alinvite.use"          # 新玩家使用邀请码权限
-  allow_veteran_to_bind: false   # 是否允许老玩家绑定老玩家
+  length: 6                    # 邀请码长度
+  charset: "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789"
+  prefix: ""                   # 邀请码前缀
+  veteran_permission: "alinvite.veteran"
+  use_permission: "alinvite.use"
+  allow_veteran_to_bind: false  # 是否允许老玩家绑定老玩家
+```
 
-# ========== IP 限制 ==========
+### 🛡️ IP限制设置
+
+```yaml
 ip_restriction:
-  enabled: false
-  max_invites_per_ip: 1          # 同 IP 最多绑定次数
-  prevent_self_ip: false         # 禁止同 IP 互相邀请
+  enabled: false               # 是否启用IP限制
+  max_invites_per_ip: 1       # 同一IP最大邀请次数
+  prevent_self_ip: false      # 禁止同一IP互相邀请
+```
 
-# ========== 里程碑奖励 ==========
+### 🏆 里程碑系统配置
+
+| 里程碑        | 名称   | 奖励                              |
+| ---------- | ---- | ------------------------------- |
+| ⭐ **1人**   | 社交新星 | 1000 EMC积分 + 100金币 + 10点券       |
+| ✨ **5人**   | 社交达人 | 10000 EMC积分 + 500金币 + 50点券      |
+| 🔥 **10人** | 社交传奇 | 100000 EMC积分 + 10000金币 + 1000点券 |
+
+```yaml
 milestones:
+  auto_claim: false           # 是否自动发放奖励
   1:
     name: "社交新星"
+    lore:
+      - "&b1000 EMC积分"
+      - "&a100 金币"
+      - "&b10 点券"
     rewards:
+      - type: "command"
+        value: "alex give %player% 1000"
       - type: "money"
         value: 100
       - type: "points"
         value: 10
-  5:
-    name: "社交达人"
-    rewards:
-      - type: "money"
-        value: 500
-      - type: "points"
-        value: 50
-  10:
-    name: "社交传奇"
-    rewards:
-      - type: "money"
-        value: 1000
-      - type: "points"
-        value: 100
+```
 
-# ========== 权限组奖励 ==========
-permission_group_rewards:
+### 🎁 礼包商店配置
+
+| 礼包类型        | 价格             | 新玩家奖励                        |
+| ----------- | -------------- | ---------------------------- |
+| 🆓 **基础礼包** | 免费             | 50金币 + 64熟牛肉                 |
+| 📦 **普通礼包** | 500金币 + 50点券   | 16铁锭 + 32熟牛肉 + 50金币 + 5点券    |
+| 💎 **高级礼包** | 2000金币 + 200点券 | 10钻石 + 1附魔金苹果 + 300金币 + 30点券 |
+
+```yaml
+gift_shop:
   enabled: true
-  permission_prefix: "alinvite"  # 权限前缀
-  check_interval: 10              # 检测间隔 (秒)
-  rewards:
-    "lv2":
-      money: 100
-      points: 0
-      weight: 2
-    "lv3":
-      money: 200
-      points: 0
-      weight: 3
-    "lv5":
-      money: 1000
-      points: 100
-      weight: 5
+  gifts:
+    default:
+      name: "&6基础礼包"
+      price_money: 0
+      price_points: 0
+      rewards:
+        - type: "money"
+          value: 50
+        - type: "item"
+          value: "COOKED_BEEF 64"
+```
 
-# ========== 数据库设置 ==========
+### 📢 全服公告设置
+
+```yaml
+announcements:
+  enabled: true
+  mode: "BROADCAST"
+  cross_server_sync: true
+  messages:
+    default: "&6[邀请系统] &e{player} &a累计邀请人数达到 &6{total} &a人，获得里程碑 &6{milestone_name}&a！"
+```
+
+## 🎮 功能详解
+
+### 🔄 邀请流程
+
+#### 📋 完整邀请流程
+
+| 步骤              | 描述                | 详细说明                                                         |
+| --------------- | ----------------- | ------------------------------------------------------------ |
+| **1. 老玩家获取邀请码** | 老玩家通过菜单或命令获取专属邀请码 | - 老玩家输入 `/alinvite code` 获取邀请码- 系统生成唯一的6位邀请码- 邀请码永久有效，可重复使用  |
+| **2. 新玩家加入服务器** | 新玩家首次进入服务器        | - 新玩家首次登录服务器- **需要手动输入邀请码**                                  |
+| **3. 输入邀请码**    | 新玩家通过菜单或命令输入邀请码   | - 新玩家输入 `/alinvite` 打开主菜单绑定邀请码- 或通过GUI菜单输入邀请码- 系统验证邀请码格式和有效性 |
+| **4. 验证绑定**     | 系统验证邀请码并建立绑定关系    | - 检查邀请码是否存在- 验证IP限制（防止刷小号）- 建立新玩家与老玩家的绑定关系                   |
+| **5. 发放新玩家奖励**  | 新玩家获得礼包奖励         | - 根据老玩家购买的礼包类型发放奖励- 老玩家未购买时使用默认礼包- 奖励包括金币、点券、物品等             |
+| **6. 记录邀请关系**   | 老玩家邀请人数+1         | - 在老玩家记录中增加邀请人数- 更新邀请统计数据- 记录邀请时间戳                           |
+| **7. 检查里程碑**    | 检查老玩家是否达到里程碑      | - 检查当前邀请总数- 如果达到里程碑条件，发放奖励- 触发全服公告                           |
+| **8. 后续返点**     | 新玩家充值触发返点         | - 新玩家通过第三方插件充值- 系统自动计算返点比例- 老玩家获得返点奖励                        |
+
+#### ⚡ 快速开始
+
+**老玩家操作：**
+
+```bash
+/alinvite code          # 获取邀请码
+/alinvite stats         # 查看邀请统计
+/alinvite buygift       # 购买礼包
+```
+
+**新玩家操作：**
+
+```bash
+/alinvite               # 打开主菜单绑定邀请码
+/alinvite stats         # 查看邀请统计
+```
+
+### 🎁 礼包系统
+
+| 礼包等级        | 购买条件    | 奖励内容 |
+| ----------- | ------- | ---- |
+| 📦 **基础礼包** | 免费      | 基础奖励 |
+| 📦 **普通礼包** | 金币+点券   | 中等奖励 |
+| 💎 **高级礼包** | 较多金币+点券 | 丰富奖励 |
+
+### 🏆 里程碑奖励
+
+| 里程碑        | 称号   | 奖励内容                            |
+| ---------- | ---- | ------------------------------- |
+| ⭐ **1人**   | 社交新星 | 1000 EMC积分 + 100金币 + 10点券       |
+| ✨ **5人**   | 社交达人 | 10000 EMC积分 + 500金币 + 50点券      |
+| 🔥 **10人** | 社交传奇 | 100000 EMC积分 + 10000金币 + 1000点券 |
+
+### 🔌 第三方集成
+
+#### ⚡ LuckPerms 集成
+
+当被邀请的玩家升级权限组时，邀请人可获得奖励。
+
+#### 💰 充值返点系统
+
+支持第三方充值系统，当被邀请的玩家充值时，邀请人可获得返点。
+
+##### ⚡ 支持的充值插件
+
+| 充值插件                | 支持状态 | 说明         |
+| ------------------- | ---- | ---------- |
+| ✅ **MinePay**       | 完全支持 | 自动监听充值成功事件 |
+| ✅ **SweetCheckout** | 完全支持 | 自动监听充值成功事件 |
+| 🔄 **其他插件**         | 可扩展  | 通过事件监听器支持  |
+
+##### 🔧 返点权限组
+
+| 权限组      | 返点比例 | 权限节点                    |
+| -------- | ---- | ----------------------- |
+| **基础**   | 5%   | 无需权限（默认）                |
+| **VIP**  | 15%  | `alinvite.rebate.vip`   |
+| **SVIP** | 20%  | `alinvite.rebate.svip`  |
+| **MVIP** | 25%  | `alinvite.rebate.mvip`  |
+| **管理员**  | 0%   | `alinvite.rebate.admin` |
+
+##### 📋 返点规则
+
+| 充值金额   | 返点比例    | 说明             |
+| ------ | ------- | -------------- |
+| ≥ 10点券 | 5%      | 基础返点比例（所有玩家默认） |
+| ≥ 10点券 | 10%-25% | 根据权限组获得更高返点    |
+| < 10点券 | 0%      | 不触发返点          |
+
+##### 🔧 返点权限组
+
+| 权限组      | 返点比例 | 权限节点                    |
+| -------- | ---- | ----------------------- |
+| **基础**   | 5%   | 无需权限（默认）                |
+| **VIP**  | 15%  | `alinvite.rebate.vip`   |
+| **SVIP** | 20%  | `alinvite.rebate.svip`  |
+| **MVIP** | 25%  | `alinvite.rebate.mvip`  |
+| **管理员**  | 0%   | `alinvite.rebate.admin` |
+
+## 🔧 高级配置
+
+### 🚀 性能优化特性
+
+ALInvite 经过全面性能优化，特别针对高并发服务器环境进行了专门优化。
+
+#### ⚡ Folia多线程服务器支持
+
+| 优化项目       | 效果      | 说明              |
+| ---------- | ------- | --------------- |
+| ✅ **区域调度** | 避免线程阻塞  | 使用Folia区域调度器    |
+| ✅ **异步处理** | 提升响应速度  | 所有耗时操作异步执行      |
+| ✅ **智能检测** | 自动适配服务器 | 自动检测Folia/传统服务器 |
+
+#### 💾 数据库优化
+
+| 优化项目       | 效果        | 说明            |
+| ---------- | --------- | ------------- |
+| ✅ **自动索引** | 查询速度提升80% | 自动创建数据库索引     |
+| ✅ **连接池**  | 连接复用      | 使用HikariCP连接池 |
+| ✅ **异步操作** | 避免阻塞      | 所有数据库操作异步执行   |
+
+#### 🧠 缓存优化
+
+| 优化项目           | 效果     | 说明          |
+| -------------- | ------ | ----------- |
+| ✅ **动态缓存**     | 智能调整大小 | 根据服务器规模动态调整 |
+| ✅ **Caffeine** | 高性能缓存  | 使用业界领先的缓存库  |
+| ✅ **过期策略**     | 内存管理   | 自动清理过期缓存    |
+
+### 🎯 自定义奖励类型
+
+| 奖励类型        | 描述   | 示例                         |
+| ----------- | ---- | -------------------------- |
+| ⚡ `command` | 执行命令 | `give %player% diamond 10` |
+| 💰 `money`  | 发放金币 | `value: 100`               |
+| 🎫 `points` | 发放点券 | `value: 50`                |
+| 💎 `item`   | 发放物品 | `value: "DIAMOND 10"`      |
+
+### 💾 数据库配置
+
+| 数据库类型         | 配置       | 适用场景  |
+| ------------- | -------- | ----- |
+| 📱 **SQLite** | 轻量级，无需配置 | 单机服务器 |
+| 🌐 **MySQL**  | 支持多服务器   | 服务器集群 |
+
+```yaml
 database:
-  type: "sqlite"                 # sqlite 或 mysql
-  server_id: "default"           # 服务器标识 (集群需不同ID)
+  type: "sqlite"  # 或 "mysql"
+  # MySQL 配置（如果使用MySQL）
+  host: "localhost"
+  port: 3306
+  database: "minecraft"
+  username: "root"
+  password: "password"
 ```
 
-***
+### 🌐 跨服同步
 
-## 📋 命令说明
+| 功能          | 配置                        | 说明       |
+| ----------- | ------------------------- | -------- |
+| 🔄 **跨服同步** | `cross_server_sync: true` | 多服务器环境同步 |
+| ⏱️ **同步间隔** | `sync_interval: 5`        | 同步频率（秒）  |
 
-### 玩家命令
+## 🚨 故障排除
 
-| 命令               | 说明       | 权限             |
-| ---------------- | -------- | -------------- |
-| `/alinvite`      | 打开主菜单    | `alinvite.use` |
-| `/alinvite code` | 查看自己的邀请码 | `alinvite.use` |
+### ❓ 常见问题
 
-### 管理员命令
+| 问题             | 解决方案                           |
+| -------------- | ------------------------------ |
+| 🛠️ **菜单无法打开** | 检查权限设置，确认玩家有 `alinvite.use` 权限 |
+| 🔍 **邀请码无效**   | 检查邀请码格式，检查IP限制设置               |
+| 💰 **奖励未发放**   | 检查经济插件是否正常，确认命令权限设置            |
 
-| 命令                               | 说明      | 权限               |
-| -------------------------------- | ------- | ---------------- |
-| `/alinvite admin reload`         | 重载配置文件  | `alinvite.admin` |
-| `/alinvite admin stats [玩家]`     | 查看邀请统计  | `alinvite.admin` |
-| `/alinvite admin clearcode <玩家>` | 清除玩家邀请码 | `alinvite.admin` |
+### 📝 日志调试
 
-***
+启用调试模式查看详细日志：
 
-## 🔑 权限说明
-
-### 玩家权限
-
-| 权限节点               | 说明      | 默认  |
-| ------------------ | ------- | --- |
-| `alinvite.use`     | 使用邀请码功能 | 所有人 |
-| `alinvite.veteran` | 拥有邀请码资格 | OP  |
-
-### 管理员权限
-
-| 权限节点             | 说明    | 默认 |
-| ---------------- | ----- | -- |
-| `alinvite.admin` | 管理员命令 | OP |
-
-### 权限组奖励权限
-
-| 权限节点           | 触发奖励      |
-| -------------- | --------- |
-| `alinvite.lv2` | 触发 lv2 奖励 |
-| `alinvite.lv3` | 触发 lv3 奖励 |
-| `alinvite.lv4` | 触发 lv4 奖励 |
-| `alinvite.lv5` | 触发 lv5 奖励 |
-| `alinvite.lv6` | 触发 lv6 奖励 |
-
-***
-
-## 🎮 使用教程
-
-### 1. 基础设置
-
-1. 配置 `veteran_permission` 决定谁可以成为"老玩家"（拥有邀请码）
-2. 配置 `use_permission` 决定谁可以使用邀请码绑定
-3. 在权限插件中给老玩家添加 `alinvite.veteran` 权限
-
-### 2. 邀请流程
-
-```
-老玩家 (有 alinvite.veteran)
-    ↓ 打开菜单点击"邀请中心"
-    ↓ 查看自己的邀请码 (如 ABC123)
-    ↓ 分享给新玩家
-
-新玩家 (有 alinvite.use)
-    ↓ 打开菜单点击"填写邀请码"
-    ↓ 输入老玩家的邀请码 ABC123
-    ↓ 绑定成功，新玩家获得礼包奖励
+```yaml
+# 在 config.yml 中添加
+debug: true
 ```
 
-### 3. 礼包商店
+## 🔌 API 接口
 
-老玩家可以在礼包商店购买礼包：
-
-| 礼包   | 价格             | 新人奖励              |
-| ---- | -------------- | ----------------- |
-| 基础礼包 | 免费             | 50金币 + 64熟牛肉      |
-| 普通礼包 | 500金币 / 50点券   | 50金币 + 5点券 + 物品   |
-| 高级礼包 | 2000金币 / 200点券 | 300金币 + 30点券 + 钻石 |
-
-### 4. 里程碑奖励
-
-当老玩家累计邀请达到指定人数时，自动获得里程碑奖励：
-
-| 里程碑 | 名称   | 奖励示例           |
-| --- | ---- | -------------- |
-| 1人  | 社交新星 | 100金币 + 10点券   |
-| 5人  | 社交达人 | 500金币 + 50点券   |
-| 10人 | 社交传奇 | 1000金币 + 100点券 |
-
-### 5. 权限组奖励
-
-当新人加入指定权限组时，奖励邀请他的老玩家：
-
-```
-配置示例:
-permission_group_rewards:
-  rewards:
-    "lv2":    # 新人需要 alinvite.lv2 权限
-      money: 100
-      points: 0
-    "vip":    # 新人需要 alinvite.vip 权限
-      money: 500
-      points: 50
-```
-
-**触发条件**: 新人获得 `alinvite.lv2` 权限 → 老玩家获得对应金币奖励
-
-**实时检测**: 配合 LuckPerms 可实现权限变化时实时奖励
-
-***
-
-## 🔌 API 文档
-
-### Maven 依赖
-
-```xml
-<dependency>
-    <groupId>com.alinvite</groupId>
-    <artifactId>ALInvite</artifactId>
-    <version>1.0.1</version>
-    <scope>provided</scope>
-</dependency>
-```
-
-### 初始化
+插件提供完整的 API 接口，方便其他插件集成：
 
 ```java
-import com.alinvite.ALInvite;
-import com.alinvite.api.ALInviteAPI;
+// 获取插件实例
+ALInviteAPI api = ALInviteAPI.getInstance();
 
-ALInvite plugin = (ALInvite) getServer().getPluginManager().getPlugin("ALInvite");
-if (plugin != null) {
-    ALInviteAPI.init(plugin);
-}
-```
+// 注册邀请成功监听器
+api.registerInviteSuccessListener((inviter, invited) -> {
+    // 自定义逻辑
+});
 
-### API 方法
-
-```java
-// 获取邀请码
-CompletableFuture<String> code = ALInviteAPI.getInviteCode(Player player);
-
-// 获取邀请人数
-CompletableFuture<Integer> total = ALInviteAPI.getTotalInvites(Player player);
-
-// 检查绑定状态
-CompletableFuture<Boolean> bound = ALInviteAPI.isPlayerBound(Player player);
-
-// 获取邀请人名称
-CompletableFuture<String> inviterName = ALInviteAPI.getInviterName(Player player);
-
-// 获取邀请人 UUID
-CompletableFuture<UUID> inviter = ALInviteAPI.getInviterUuid(Player player);
-
-// 获取当前礼包配置
-CompletableFuture<GiftConfig> gift = ALInviteAPI.getActiveGift(Player player);
-
-// 监听邀请成功事件
-ALInviteAPI.registerInviteListener((inviterUuid, inviteeUuid) -> {
-    // 处理邀请成功逻辑
+// 获取玩家邀请数据
+api.getPlayerData(playerUUID).thenAccept(data -> {
+    int totalInvites = data.getTotalInvites();
 });
 ```
 
-***
+## 📞 技术支持
 
-## ❓ 常见问题
+如有问题或建议，请联系插件作者：
 
-### Q: 玩家没有邀请码？
-
-检查玩家是否拥有 `alinvite.veteran` 权限，或者是否在配置中修改了权限节点。
-
-### Q: 新人无法输入邀请码？
-
-检查新人是否拥有 `alinvite.use` 权限。
-
-### Q: 金币/点券没有发放？
-
-1. 检查是否安装了经济插件 (Vault/PlayerPoints)
-2. 检查 config.yml 中的经济配置是否正确
-3. 查看服务器日志是否有错误信息
-
-### Q: 权限组奖励没有触发？
-
-1. 确认 `permission_group_rewards.enabled: true`
-2. 确认新人拥有对应的 `alinvite.xxx` 权限
-3. 如果不是 LuckPerms，最多可能有 10 秒延迟
-
-### Q: 跨服公告重复？
-
-确认每个服务器的 `database.server_id` 配置不同。
+- **作者**：Allen\_Linong
+- **QQ**：1422163791
 
 ***
 
-## 📄 许可证
-
-本插件遵循 MIT 许可证开源。

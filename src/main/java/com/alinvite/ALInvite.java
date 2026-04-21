@@ -4,6 +4,8 @@ import com.alinvite.commands.CommandHandler;
 import com.alinvite.config.ConfigManager;
 import com.alinvite.database.DatabaseManager;
 import com.alinvite.gui.MenuManager;
+import com.alinvite.integration.SafeMinePayListener;
+import com.alinvite.integration.SafeSweetCheckoutListener;
 import com.alinvite.listeners.InviteListener;
 import com.alinvite.listeners.LuckPermsListener;
 import com.alinvite.listeners.MenuListener;
@@ -12,9 +14,12 @@ import com.alinvite.manager.CacheManager;
 import com.alinvite.manager.InviteManager;
 import com.alinvite.manager.MilestoneManager;
 import com.alinvite.manager.GiftManager;
+import com.alinvite.manager.PointsRebateManager;
 import com.alinvite.placeholder.PlaceholderHook;
 import com.alinvite.api.ALInviteAPI;
 import com.alinvite.utils.SchedulerUtils;
+import com.alinvite.utils.ThreadPoolManager;
+import com.alinvite.utils.FoliaScheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -32,6 +37,9 @@ public class ALInvite extends JavaPlugin {
     private MenuListener menuListener;
     private PermissionGroupRewardListener permissionGroupRewardListener;
     private CommandHandler commandHandler;
+    private PointsRebateManager pointsRebateManager;
+    private ThreadPoolManager threadPoolManager;
+    private FoliaScheduler foliaScheduler;
 
     public static ALInvite getInstance() {
         return instance;
@@ -45,36 +53,51 @@ public class ALInvite extends JavaPlugin {
         return permissionGroupRewardListener;
     }
 
+    public FoliaScheduler getFoliaScheduler() {
+        return foliaScheduler;
+    }
+
     @Override
     public void onEnable() {
-        instance = this;
+        try {
+            instance = this;
+            getLogger().info("正在启动 ALInvite 插件...");
 
-        if (!initConfig()) {
-            getLogger().severe("配置文件加载失败！插件禁用。");
+            if (!initConfig()) {
+                getLogger().severe("配置文件加载失败！插件禁用。");
+                getServer().getPluginManager().disablePlugin(this);
+                return;
+            }
+
+            if (!initDatabase()) {
+                getLogger().severe("数据库初始化失败！插件禁用。");
+                getServer().getPluginManager().disablePlugin(this);
+                return;
+            }
+
+            initManagers();
+            initCommands();
+            initListeners();
+            initPlaceholder();
+            initAPI();
+
+            scheduleAnnouncementSync();
+            schedulePermissionGroupCheck();
+
+            getLogger().info("ALInvite 插件已成功启用！版本: " + getDescription().getVersion());
+        } catch (Exception e) {
+            getLogger().severe("插件启动过程中发生严重错误！");
+            getLogger().severe("错误信息: " + e.getMessage());
+            e.printStackTrace();
             getServer().getPluginManager().disablePlugin(this);
-            return;
         }
-
-        if (!initDatabase()) {
-            getLogger().severe("数据库初始化失败！插件禁用。");
-            getServer().getPluginManager().disablePlugin(this);
-            return;
-        }
-
-        initManagers();
-        initCommands();
-        initListeners();
-        initPlaceholder();
-        initAPI();
-
-        scheduleAnnouncementSync();
-        schedulePermissionGroupCheck();
-
-        getLogger().info("ALInvite 插件已成功启用！");
     }
 
     @Override
     public void onDisable() {
+        if (threadPoolManager != null) {
+            threadPoolManager.shutdown();
+        }
         if (databaseManager != null) {
             databaseManager.close();
         }
@@ -109,11 +132,14 @@ public class ALInvite extends JavaPlugin {
     }
 
     private void initManagers() {
+        foliaScheduler = new FoliaScheduler(this);
+        threadPoolManager = new ThreadPoolManager(this);
         cacheManager = new CacheManager(this);
         inviteManager = new InviteManager(this);
         milestoneManager = new MilestoneManager(this);
         giftManager = new GiftManager(this);
         menuManager = new MenuManager(this);
+        pointsRebateManager = new PointsRebateManager(this);
     }
 
     private void initCommands() {
@@ -129,6 +155,30 @@ public class ALInvite extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(menuListener, this);
         Bukkit.getPluginManager().registerEvents(permissionGroupRewardListener, this);
         Bukkit.getPluginManager().registerEvents(new LuckPermsListener(this, permissionGroupRewardListener), this);
+        
+        // 条件注册第三方充值插件监听器（避免使用抽象事件类）
+        registerThirdPartyListeners();
+    }
+    
+    private void registerThirdPartyListeners() {
+        // 使用反射安全地注册第三方插件监听器
+        try {
+            // 检查MinePay插件是否存在
+            if (Bukkit.getPluginManager().getPlugin("MinePay") != null) {
+                // 使用安全的事件监听器
+                Bukkit.getPluginManager().registerEvents(new SafeMinePayListener(this), this);
+                getLogger().info("已注册 MinePay 事件监听器");
+            }
+            
+            // 检查SweetCheckout插件是否存在
+            if (Bukkit.getPluginManager().getPlugin("SweetCheckout") != null) {
+                // 使用安全的事件监听器
+                Bukkit.getPluginManager().registerEvents(new SafeSweetCheckoutListener(this), this);
+                getLogger().info("已注册 SweetCheckout 事件监听器");
+            }
+        } catch (Exception e) {
+            getLogger().warning("注册第三方插件监听器时出错: " + e.getMessage());
+        }
     }
 
     private void initPlaceholder() {
@@ -203,5 +253,9 @@ public class ALInvite extends JavaPlugin {
 
     public CommandHandler getCommandHandler() {
         return commandHandler;
+    }
+
+    public PointsRebateManager getPointsRebateManager() {
+        return pointsRebateManager;
     }
 }

@@ -3,6 +3,7 @@ package com.alinvite.api;
 import com.alinvite.ALInvite;
 import com.alinvite.manager.GiftManager;
 import com.alinvite.manager.MilestoneManager;
+import com.alinvite.manager.PointsRebateManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -176,5 +177,68 @@ public final class ALInviteAPI {
     @FunctionalInterface
     public interface InviteSuccessListener {
         void onInviteSuccess(UUID inviterUuid, UUID inviteeUuid);
+    }
+
+    // ==================== 点券充值返点系统 API ====================
+
+    /**
+     * 处理点券充值返点（第三方插件专用）
+     * 第三方充值插件调用此API触发返点处理
+     * 
+     * @param targetPlayer 目标玩家名称（接收点券的玩家）
+     * @param amount 充值点券数量
+     * @return CompletableFuture<Boolean> 处理结果，true表示成功
+     */
+    public static CompletableFuture<Boolean> processPointsRecharge(String targetPlayer, double amount) {
+        return plugin.getPointsRebateManager().processRecharge("ThirdParty", targetPlayer, amount, false);
+    }
+
+    /**
+     * 处理点券充值返点（带操作者信息）
+     * 适用于管理员命令调用
+     * 
+     * @param operator 操作者名称（执行命令的玩家或控制台）
+     * @param targetPlayer 目标玩家名称（接收点券的玩家）
+     * @param amount 充值点券数量
+     * @param skipRebate 是否跳过返点处理（用于测试或特殊情况）
+     * @return CompletableFuture<Boolean> 处理结果，true表示成功
+     */
+    public static CompletableFuture<Boolean> processPointsRecharge(
+            String operator, String targetPlayer, double amount, boolean skipRebate) {
+        return plugin.getPointsRebateManager().processRecharge(operator, targetPlayer, amount, skipRebate);
+    }
+
+    /**
+     * 获取玩家累计返点总额
+     * @param player 玩家对象
+     * @return CompletableFuture<Double> 累计返点总额
+     */
+    public static CompletableFuture<Double> getTotalRebateAmount(Player player) {
+        return getTotalRebateAmount(player.getUniqueId());
+    }
+
+    /**
+     * 获取玩家累计返点总额
+     * @param uuid 玩家UUID
+     * @return CompletableFuture<Double> 累计返点总额
+     */
+    public static CompletableFuture<Double> getTotalRebateAmount(UUID uuid) {
+        return CompletableFuture.supplyAsync(() -> {
+            // 从数据库获取累计返点总额
+            return plugin.getDatabaseManager().getTotalRebateAmount(uuid).join();
+        });
+    }
+
+    /**
+     * 检查跨服重复交易
+     * @param playerUuid 玩家UUID
+     * @param amount 充值金额
+     * @return CompletableFuture<Boolean> 是否为重复交易
+     */
+    public static CompletableFuture<Boolean> checkRebateDuplicate(UUID playerUuid, double amount) {
+        return CompletableFuture.supplyAsync(() -> {
+            // 检查数据库中是否存在相同交易记录
+            return plugin.getDatabaseManager().checkRebateDuplicate(playerUuid, amount).join();
+        });
     }
 }

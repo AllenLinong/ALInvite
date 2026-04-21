@@ -62,7 +62,7 @@ public class PermissionGroupRewardListener implements Listener {
             }
         }
 
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        com.alinvite.utils.SchedulerUtils.runTaskLater(plugin, () -> {
             checkGroupUpgrade(player, playerUuid);
         }, 20L);
     }
@@ -76,7 +76,7 @@ public class PermissionGroupRewardListener implements Listener {
         Player player = event.getPlayer();
         UUID playerUuid = player.getUniqueId();
 
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        com.alinvite.utils.SchedulerUtils.runTaskLater(plugin, () -> {
             checkGroupUpgrade(player, playerUuid);
         }, 20L);
     }

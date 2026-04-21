@@ -118,6 +118,67 @@ public class DatabaseManager {
         executeUpdate(recordsTable.replace("{prefix}", tablePrefix));
         executeUpdate(announcementsTable.replace("{prefix}", tablePrefix));
         executeUpdate(pendingMilestonesTable.replace("{prefix}", tablePrefix));
+        
+        // 创建点券返点记录表（用于跨服防重复）
+        String pointsRebateTable = """
+            CREATE TABLE IF NOT EXISTS `{prefix}points_rebate` (
+                `id` INTEGER PRIMARY KEY {autoIncrement},
+                `transaction_key` VARCHAR(128) NOT NULL UNIQUE,
+                `player_uuid` VARCHAR(36) NOT NULL,
+                `amount` DECIMAL(10,2) NOT NULL,
+                `inviter_uuid` VARCHAR(36),
+                `rebate_amount` DECIMAL(10,2),
+                `created_at` BIGINT NOT NULL,
+                `processed_at` BIGINT DEFAULT NULL,
+                `status` VARCHAR(16) DEFAULT 'PENDING'
+            )
+            """.replace("{autoIncrement}", autoIncrementSyntax);
+        
+        executeUpdate(pointsRebateTable.replace("{prefix}", tablePrefix));
+        
+        // 创建必要的索引以提升查询性能
+        createIndexes();
+    }
+    
+    /**
+     * 创建数据库索引以提升查询性能
+     */
+    private void createIndexes() {
+        plugin.getLogger().info("正在创建数据库索引...");
+        
+        // 玩家表索引
+        String idxPlayersInviteCode = "CREATE INDEX IF NOT EXISTS idx_{prefix}players_invite_code ON {prefix}players(invite_code)";
+        String idxPlayersTotalInvites = "CREATE INDEX IF NOT EXISTS idx_{prefix}players_total_invites ON {prefix}players(total_invites)";
+        
+        // 记录表索引
+        String idxRecordsInviterUuid = "CREATE INDEX IF NOT EXISTS idx_{prefix}records_inviter_uuid ON {prefix}records(inviter_uuid)";
+        String idxRecordsInviteeUuid = "CREATE INDEX IF NOT EXISTS idx_{prefix}records_invitee_uuid ON {prefix}records(invitee_uuid)";
+        String idxRecordsInvitedAt = "CREATE INDEX IF NOT EXISTS idx_{prefix}records_invited_at ON {prefix}records(invited_at)";
+        
+        // 点券返点表索引
+        String idxPointsRebateTransactionKey = "CREATE INDEX IF NOT EXISTS idx_{prefix}points_rebate_transaction_key ON {prefix}points_rebate(transaction_key)";
+        String idxPointsRebatePlayerUuid = "CREATE INDEX IF NOT EXISTS idx_{prefix}points_rebate_player_uuid ON {prefix}points_rebate(player_uuid)";
+        String idxPointsRebateCreatedAt = "CREATE INDEX IF NOT EXISTS idx_{prefix}points_rebate_created_at ON {prefix}points_rebate(created_at)";
+        
+        // 公告表索引
+        String idxAnnouncementsCreatedAt = "CREATE INDEX IF NOT EXISTS idx_{prefix}announcements_created_at ON {prefix}announcements(created_at)";
+        
+        // 待处理里程碑表索引
+        String idxPendingMilestonesPlayerUuid = "CREATE INDEX IF NOT EXISTS idx_{prefix}pending_milestones_player_uuid ON {prefix}pending_milestones(player_uuid)";
+        
+        // 执行索引创建
+        executeUpdate(idxPlayersInviteCode.replace("{prefix}", tablePrefix));
+        executeUpdate(idxPlayersTotalInvites.replace("{prefix}", tablePrefix));
+        executeUpdate(idxRecordsInviterUuid.replace("{prefix}", tablePrefix));
+        executeUpdate(idxRecordsInviteeUuid.replace("{prefix}", tablePrefix));
+        executeUpdate(idxRecordsInvitedAt.replace("{prefix}", tablePrefix));
+        executeUpdate(idxPointsRebateTransactionKey.replace("{prefix}", tablePrefix));
+        executeUpdate(idxPointsRebatePlayerUuid.replace("{prefix}", tablePrefix));
+        executeUpdate(idxPointsRebateCreatedAt.replace("{prefix}", tablePrefix));
+        executeUpdate(idxAnnouncementsCreatedAt.replace("{prefix}", tablePrefix));
+        executeUpdate(idxPendingMilestonesPlayerUuid.replace("{prefix}", tablePrefix));
+        
+        plugin.getLogger().info("数据库索引创建完成！");
     }
 
     private int executeUpdate(String sql) {
@@ -870,6 +931,159 @@ public class DatabaseManager {
 
     public CompletableFuture<Void> addClaimedPermissionGroup(UUID inviterUuid, UUID inviteeUuid, String group) {
         return claimPermissionGroup(inviterUuid, inviteeUuid, group);
+    }
+
+    /**
+     * 检查跨服重复交易
+     * 使用全局交易标识防止同一笔充值在不同服务器上重复发放返点
+     * 
+     * @param transactionKey 全局交易标识（格式：rebate_<UUID>_<金额>）
+     * @return CompletableFuture<Boolean> true表示存在重复交易
+     */
+    public CompletableFuture<Boolean> checkCrossServerDuplicate(String transactionKey) {
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = "SELECT COUNT(*) as count FROM " + tablePrefix + "points_rebate WHERE transaction_key = ?";
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, transactionKey);
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    return rs.getInt("count") > 0;
+                }
+            } catch (SQLException e) {
+                plugin.getLogger().severe("检查跨服重复交易失败: " + e.getMessage());
+            }
+            return false;
+        });
+    }
+
+    /**
+     * 获取玩家累计返点总额
+     * 
+     * @param inviterUuid 邀请人UUID
+     * @return CompletableFuture<Double> 累计返点总额
+     */
+    public CompletableFuture<Double> getTotalRebateAmount(UUID inviterUuid) {
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = "SELECT SUM(rebate_amount) as total FROM " + tablePrefix + "points_rebate " +
+                        "WHERE inviter_uuid = ? AND status = 'COMPLETED'";
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, inviterUuid.toString());
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    double total = rs.getDouble("total");
+                    // 如果返回值为0或NULL，确保返回0.0而不是null
+                    return rs.wasNull() ? 0.0 : total;
+                }
+            } catch (SQLException e) {
+                plugin.getLogger().severe("获取累计返点总额失败: " + e.getMessage());
+            }
+            return 0.0;
+        });
+    }
+
+    /**
+     * 检查跨服重复交易
+     * 使用玩家UUID和金额生成唯一标识检查重复
+     * 
+     * @param playerUuid 玩家UUID
+     * @param amount 充值金额
+     * @return CompletableFuture<Boolean> true表示存在重复交易
+     */
+    public CompletableFuture<Boolean> checkRebateDuplicate(UUID playerUuid, double amount) {
+        return CompletableFuture.supplyAsync(() -> {
+            String transactionKey = "rebate_" + playerUuid.toString() + "_" + amount;
+            String sql = "SELECT COUNT(*) as count FROM " + tablePrefix + "points_rebate WHERE transaction_key = ?";
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, transactionKey);
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    return rs.getInt("count") > 0;
+                }
+            } catch (SQLException e) {
+                plugin.getLogger().severe("检查返点重复交易失败: " + e.getMessage());
+            }
+            return false;
+        });
+    }
+
+    /**
+     * 获取今日返点总额
+     * 用于检查每日返点上限
+     * 
+     * @param inviterUuid 邀请人UUID
+     * @return CompletableFuture<Double> 今日返点总额
+     */
+    public CompletableFuture<Double> getTodayRebateTotal(UUID inviterUuid) {
+        return CompletableFuture.supplyAsync(() -> {
+            long todayStart = System.currentTimeMillis() - (System.currentTimeMillis() % (24 * 60 * 60 * 1000));
+            
+            String sql = "SELECT SUM(rebate_amount) as total FROM " + tablePrefix + "points_rebate " +
+                        "WHERE inviter_uuid = ? AND created_at >= ? AND status = 'COMPLETED'";
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, inviterUuid.toString());
+                stmt.setLong(2, todayStart);
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    double total = rs.getDouble("total");
+                    // 如果返回值为0或NULL，确保返回0.0而不是null
+                    return rs.wasNull() ? 0.0 : total;
+                }
+            } catch (SQLException e) {
+                plugin.getLogger().severe("获取今日返点总额失败: " + e.getMessage());
+            }
+            return 0.0;
+        });
+    }
+
+    /**
+     * 记录点券返点交易
+     * 用于跨服防重复和统计
+     * 
+     * @param transactionKey 全局交易标识
+     * @param playerUuid 玩家UUID
+     * @param amount 充值金额
+     * @param inviterUuid 邀请人UUID（可为null）
+     * @param rebateAmount 返点金额（可为null）
+     * @return CompletableFuture<Boolean> 记录是否成功
+     */
+    public CompletableFuture<Boolean> recordRebateTransaction(String transactionKey, UUID playerUuid, double amount, 
+                                                             UUID inviterUuid, Double rebateAmount) {
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = "INSERT INTO " + tablePrefix + "points_rebate " +
+                        "(transaction_key, player_uuid, amount, inviter_uuid, rebate_amount, created_at, status) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)";
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, transactionKey);
+                stmt.setString(2, playerUuid.toString());
+                stmt.setDouble(3, amount);
+                
+                if (inviterUuid != null) {
+                    stmt.setString(4, inviterUuid.toString());
+                } else {
+                    stmt.setNull(4, java.sql.Types.VARCHAR);
+                }
+                
+                if (rebateAmount != null) {
+                    stmt.setDouble(5, rebateAmount);
+                } else {
+                    stmt.setNull(5, java.sql.Types.DECIMAL);
+                }
+                
+                stmt.setLong(6, System.currentTimeMillis());
+                stmt.setString(7, rebateAmount != null ? "COMPLETED" : "PENDING");
+                
+                return stmt.executeUpdate() > 0;
+                
+            } catch (SQLException e) {
+                plugin.getLogger().severe("记录返点交易失败: " + e.getMessage());
+                return false;
+            }
+        });
     }
 
     public void syncAnnouncements() {

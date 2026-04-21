@@ -45,6 +45,7 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
             case "buygift" -> handleBuyGift(sender);
             case "help" -> handleHelp(sender);
             case "admin" -> handleAdmin(sender, args);
+            case "givedj" -> handleGiveDj(sender, args);
             default -> sender.sendMessage(plugin.getConfigManager().getMessage("errors.unknown"));
         }
 
@@ -319,7 +320,7 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
         List<String> completions = new ArrayList<>();
 
         if (args.length == 1) {
-            completions.addAll(Arrays.asList("code", "stats", "buygift", "help", "admin"));
+            completions.addAll(Arrays.asList("code", "stats", "buygift", "help", "admin", "givedj"));
             return filterByInput(completions, args[0]);
         }
 
@@ -362,6 +363,22 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
             );
         }
 
+        // givedj 命令补全
+        if (args.length == 2 && args[0].equalsIgnoreCase("givedj")) {
+            return filterByInput(
+                Bukkit.getOnlinePlayers().stream().map(Player::getName).collect(Collectors.toList()),
+                args[1]
+            );
+        }
+
+        if (args.length == 3 && args[0].equalsIgnoreCase("givedj")) {
+            return filterByInput(Arrays.asList("100", "500", "1000", "5000"), args[2]);
+        }
+
+        if (args.length == 4 && args[0].equalsIgnoreCase("givedj")) {
+            return filterByInput(Arrays.asList("-norebate"), args[3]);
+        }
+
         return completions;
     }
 
@@ -371,5 +388,45 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
         return list.stream()
             .filter(s -> s.toLowerCase().startsWith(lowerInput))
             .collect(Collectors.toList());
+    }
+
+    private void handleGiveDj(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("alinvite.admin")) {
+            sender.sendMessage(plugin.getConfigManager().getMessage("errors.no_permission"));
+            return;
+        }
+
+        if (args.length < 3) {
+            sender.sendMessage("用法: /alinvite givedj <玩家> <点券数量> [-norebate]");
+            sender.sendMessage("参数说明:");
+            sender.sendMessage("  - 玩家: 接收点券的玩家名称");
+            sender.sendMessage("  - 点券数量: 充值的点券数量");
+            sender.sendMessage("  - -norebate: 可选参数，跳过返点处理");
+            return;
+        }
+
+        String targetPlayer = args[1];
+        double amount;
+        
+        try {
+            amount = Double.parseDouble(args[2]);
+        } catch (NumberFormatException e) {
+            sender.sendMessage("点券数量必须是数字");
+            return;
+        }
+
+        boolean skipRebate = args.length >= 4 && "-norebate".equalsIgnoreCase(args[3]);
+
+        plugin.getPointsRebateManager().processRecharge(sender.getName(), targetPlayer, amount, skipRebate)
+            .thenAccept(success -> {
+                if (success) {
+                    String message = skipRebate 
+                        ? "已成功为玩家 " + targetPlayer + " 充值 " + amount + " 点券（跳过返点）"
+                        : "已成功为玩家 " + targetPlayer + " 充值 " + amount + " 点券，返点已处理";
+                    sender.sendMessage(message);
+                } else {
+                    sender.sendMessage("充值失败，请检查玩家名称和金额");
+                }
+            });
     }
 }

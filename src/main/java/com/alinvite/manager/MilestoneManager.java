@@ -145,10 +145,17 @@ public class MilestoneManager {
                         Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), command));
                 }
                 case "money" -> {
-                    Economy economy = plugin.getServer().getServicesManager()
-                        .getRegistration(Economy.class).getProvider();
-                    if (economy != null) {
-                        economy.depositPlayer(player, Double.parseDouble(reward.value.toString()));
+                    var registration = plugin.getServer().getServicesManager()
+                        .getRegistration(Economy.class);
+                    if (registration != null) {
+                        Economy economy = registration.getProvider();
+                        if (economy != null) {
+                            economy.depositPlayer(player, Double.parseDouble(reward.value.toString()));
+                        } else {
+                            plugin.getLogger().warning("经济服务提供者为null，无法发放金币奖励");
+                        }
+                    } else {
+                        plugin.getLogger().warning("未找到经济服务注册，请安装Vault和经济插件");
                     }
                 }
                 case "points" -> {

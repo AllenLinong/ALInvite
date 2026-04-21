@@ -49,8 +49,8 @@ errors:
   unknown: "&cUnknown command"
   invalid_code: "&cInvalid invite code"
   already_used: "&cYou have already used an invite code"
-  veteran_cannot_bind: "&cYou are already a veteran player, cannot bind another veteran's invite code"
-  not_registered: "&cYou haven't registered an invite code, please contact admin"
+  veteran_cannot_bind: "&cYou are already a veteran player and cannot bind other veteran players' invite codes"
+  no_invite_code: "&cYou have not unlocked the invite code yet"
 
 milestone:
   reached: "&aCongratulations! You've reached {name} milestone and received rewards!"
@@ -59,11 +59,14 @@ milestone:
   not_unlocked: "&c{name} milestone is locked. You need to invite {remaining} more players"
   unlocked: "&a{name} milestone unlocked! Please claim your reward in the menu!"
 
+points_rebate:
+  rebate_given: "&aNew player &e{player}&a you invited recharged &6{amount}&a points, you received &e{rebate_amount}&a points rebate!"
+
 permission_group_reward:
-  money: "&aPlayer &e{player} &ajoined group &6{group}&a, you received &e{money} &agold reward!"
-  points: "&aPlayer &e{player} &ajoined group &6{group}&a, you received &e{points} &apoints reward!"
-  offline_money: "&aPlayer &e{player} &ajoined group &6{group}&a, you received &e{money} &agold reward (offline)!"
-  offline_points: "&aPlayer &e{player} &ajoined group &6{group}&a, you received &e{points} &apoints reward (offline)!"
+  money: "&aPlayer &e{player} &ayou invited upgraded to &6{group}&a, you received &e{money} &agold reward!"
+  points: "&aPlayer &e{player} &ayou invited upgraded to &6{group}&a, you received &e{points} &apoints reward!"
+  offline_money: "&aPlayer &e{player} &ayou invited upgraded to &6{group}&a, you received &e{money} &agold reward (offline)!"
+  offline_points: "&aPlayer &e{player} &ayou invited upgraded to &6{group}&a, you received &e{points} &apoints reward (offline)!"
 
 dialog:
   cancel: "&cCancelled invite code input"

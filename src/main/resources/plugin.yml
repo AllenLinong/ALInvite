@@ -1,9 +1,12 @@
 name: ALInvite
-version: 1.0.5
+version: 1.0.7
 main: com.alinvite.ALInvite
 api-version: '1.20'
 author: Allen_Linong
 description: 邀请新玩家入服的激励系统插件
+folia-supported: true
+website: https://github.com/AllenLinong/ALInvite
+load: STARTUP
 
 commands:
   alinvite:

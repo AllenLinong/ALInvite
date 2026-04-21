@@ -1,381 +1,405 @@
 # ALInvite API 文档
 
-## 简介
+## 📖 概述
 
-ALInvite 是一款 Minecraft 服务器邀请系统插件，支持邀请码绑定、礼包奖励、里程碑奖励、权限组奖励等功能。本文档面向希望与 ALInvite 联动的第三方插件开发者。
+ALInvite 提供完整的 API 接口，支持第三方插件集成。通过 API 可以触发返点处理、查询邀请关系、管理邀请码等功能。
 
-## 依赖引入
+## 🚀 快速开始
 
-### Maven
-
-```xml
-<dependency>
-    <groupId>com.alinvite</groupId>
-    <artifactId>ALInvite</artifactId>
-    <version>1.0.5</version>
-    <scope>provided</scope>
-</dependency>
-```
-
-### Gradle (Kotlin DSL)
-
-```kotlin
-compileOnly("com.alinvite:ALInvite:1.0.5")
-```
-
-## 前置要求
-
-你的插件需要在 `plugin.yml` 中声明对 ALInvite 的软依赖：
-
-```yaml
-name: YourPlugin
-version: 1.0.0
-main: com.example.YourPlugin
-softdepend:
-  - ALInvite
-```
-
-## 初始化
-
-在你的插件启动时获取 ALInvite API 实例：
+### 📦 导入 API
 
 ```java
-import com.alinvite.ALInvite;
 import com.alinvite.api.ALInviteAPI;
-import org.bukkit.plugin.java.JavaPlugin;
-
-public class YourPlugin extends JavaPlugin {
-
-    @Override
-    public void onEnable() {
-        // 等待 ALInvite 完全加载
-        getServer().getScheduler().runTaskLater(this, () -> {
-            ALInvite alInvite = (ALInvite) getServer().getPluginManager().getPlugin("ALInvite");
-            if (alInvite != null) {
-                ALInviteAPI.init(alInvite);
-                getLogger().info("ALInvite API 初始化成功");
-            }
-        }, 1L);
-    }
-}
 ```
 
-***
-
-## API 参考
-
-所有方法都是**异步**的，返回 `CompletableFuture`，请勿在主线程调用。
-
-***
-
-### 1. 邀请码相关
-
-#### 获取玩家邀请码
+### 🔧 获取插件实例
 
 ```java
-// 通过 Player 对象获取
-CompletableFuture<String> code = ALInviteAPI.getInviteCode(Player player);
+// 方式1：通过 Bukkit 获取
+ALInvite plugin = (ALInvite) Bukkit.getPluginManager().getPlugin("ALInvite");
 
-// 通过 UUID 获取
-CompletableFuture<String> code = ALInviteAPI.getInviteCode(UUID uuid);
+// 方式2：通过 API 类获取（推荐）
+ALInvite plugin = ALInviteAPI.getPlugin();
 ```
 
-**返回值说明：**
+## 🔌 API 方法详解
 
-- 如果玩家有邀请码，返回格式如 `"ABC123"`（不含前缀）或 `"AL-ABC123"`（含前缀）
-- 如果玩家没有邀请码或不具备老玩家权限，返回 `null`
+### 💰 点券充值返点 API
 
-**权限要求：**
+#### processPointsRecharge - 处理点券充值返点（第三方插件专用）
 
-- 玩家需要拥有 `alinvite.veteran` 权限（或配置中的自定义权限）才能获得邀请码
-
-**示例：**
-
+**方法签名：**
 ```java
-ALInviteAPI.getInviteCode(player).thenAccept(code -> {
-    if (code != null) {
-        player.sendMessage("你的邀请码是: " + code);
+public static CompletableFuture<Boolean> processPointsRecharge(
+    String targetPlayer, 
+    double amount
+)
+```
+
+**参数说明：**
+- `targetPlayer` - 目标玩家名称（接收点券的玩家）
+- `amount` - 充值点券数量
+
+**返回值：**
+- `CompletableFuture<Boolean>` - 处理结果，`true` 表示成功
+
+**使用示例：**
+```java
+// 第三方支付插件调用示例
+CompletableFuture<Boolean> result = ALInviteAPI.processPointsRecharge(
+    "Steve", 
+    1000.0
+);
+
+result.thenAccept(success -> {
+    if (success) {
+        getLogger().info("返点处理成功");
     } else {
-        player.sendMessage("你还没有邀请码");
+        getLogger().warning("返点处理失败");
     }
 });
 ```
 
-***
+#### processPointsRecharge - 处理点券充值返点（完整版）
 
-#### 获取玩家邀请人数
-
+**方法签名：**
 ```java
-// 通过 Player 对象获取
-CompletableFuture<Integer> total = ALInviteAPI.getTotalInvites(Player player);
-
-// 通过 UUID 获取
-CompletableFuture<Integer> total = ALInviteAPI.getTotalInvites(UUID uuid);
+public static CompletableFuture<Boolean> processPointsRecharge(
+    String operator, 
+    String targetPlayer, 
+    double amount, 
+    boolean skipRebate
+)
 ```
 
-**返回值说明：**
+**参数说明：**
+- `operator` - 操作者名称（执行命令的玩家或控制台）
+- `targetPlayer` - 目标玩家名称（接收点券的玩家）
+- `amount` - 充值点券数量
+- `skipRebate` - 是否跳过返点处理（用于测试或特殊情况）
 
-- 返回该玩家成功邀请的玩家数量（已绑定且完成注册）
-
-***
-
-### 2. 绑定状态相关
-
-#### 检查玩家是否已绑定邀请人
-
+**使用示例：**
 ```java
-CompletableFuture<Boolean> bound = ALInviteAPI.isPlayerBound(Player player);
-CompletableFuture<Boolean> bound = ALInviteAPI.isPlayerBound(UUID uuid);
+// 管理员命令调用示例
+CompletableFuture<Boolean> result = ALInviteAPI.processPointsRecharge(
+    "Console", 
+    "Steve", 
+    1000.0, 
+    false
+);
 ```
 
-**返回值说明：**
+### 🔗 邀请关系查询 API
 
-- `true` - 玩家已绑定邀请人
-- `false` - 玩家未绑定（是新玩家）
+#### getInviterUuid - 获取邀请人UUID
 
-***
-
-#### 获取绑定状态文字
-
+**方法签名：**
 ```java
-CompletableFuture<String> status = ALInviteAPI.getBindStatus(Player player);
-CompletableFuture<String> status = ALInviteAPI.getBindStatus(UUID uuid);
+public static CompletableFuture<UUID> getInviterUuid(UUID playerUuid)
 ```
 
-**返回值说明：**
+**参数说明：**
+- `playerUuid` - 玩家 UUID
 
-- `"已绑定"` - 玩家已绑定邀请人
-- `"未绑定"` - 玩家未绑定
+**返回值：**
+- `CompletableFuture<UUID>` - 邀请人的 UUID，如果无邀请人返回 `null`
 
-***
-
-#### 获取邀请人名称
-
+**使用示例：**
 ```java
-CompletableFuture<String> name = ALInviteAPI.getInviterName(Player player);
-CompletableFuture<String> name = ALInviteAPI.getInviterName(UUID uuid);
-```
+UUID playerUuid = player.getUniqueId();
+CompletableFuture<UUID> inviterFuture = ALInviteAPI.getInviterUuid(playerUuid);
 
-**返回值说明：**
-
-- 如果有邀请人且在线，返回邀请人当前游戏名
-- 如果有邀请人但离线，返回数据库中保存的邀请码
-- 如果没有邀请人，返回 `"无"`
-
-***
-
-#### 获取邀请人 UUID
-
-```java
-CompletableFuture<UUID> inviter = ALInviteAPI.getInviterUuid(Player player);
-CompletableFuture<UUID> inviter = ALInviteAPI.getInviterUuid(UUID uuid);
-```
-
-**返回值说明：**
-
-- 如果有邀请人，返回邀请人 UUID
-- 如果没有邀请人，返回 `null`
-
-***
-
-#### 获取被邀请的玩家列表
-
-```java
-CompletableFuture<List<UUID>> invitees = ALInviteAPI.getInvitees(UUID inviterUuid);
-```
-
-**返回值说明：**
-
-- 返回指定邀请人邀请过的所有玩家 UUID 列表
-
-***
-
-### 3. 礼包相关
-
-#### 获取玩家已购买的礼包 ID
-
-```java
-CompletableFuture<String> giftId = ALInviteAPI.getPurchasedGift(Player player);
-CompletableFuture<String> giftId = ALInviteAPI.getPurchasedGift(UUID uuid);
-```
-
-**返回值说明：**
-
-- 返回礼包配置中的 ID，如 `"basic_gift"`、`"premium_gift"`
-- 如果玩家未购买任何礼包，返回 `null`
-
-***
-
-#### 获取玩家当前使用的礼包配置
-
-```java
-CompletableFuture<GiftConfig> gift = ALInviteAPI.getActiveGift(Player player);
-CompletableFuture<GiftConfig> gift = ALInviteAPI.getActiveGift(UUID uuid);
-```
-
-**返回值说明：**
-
-- 返回玩家当前使用的礼包完整配置
-- 如果玩家未购买且 `require_gift: false`，返回默认礼包
-- 如果玩家未购买且 `require_gift: true`，返回 `null`
-
-**GiftConfig 结构：**
-
-```java
-public class GiftConfig {
-    public String name;                        // 礼包显示名称
-    public String material;                    // 物品材质
-    public int customModelData;                // 自定义模型数据
-    public double priceMoney;                  // 金币价格
-    public int pricePoints;                    // 点券价格
-    public List<RewardItem> rewards;           // 奖励列表
-}
-
-public class RewardItem {
-    public String type;   // 奖励类型: "command", "money", "points", "item"
-    public String value;  // 奖励值（命令/数量/物品ID）
-}
-```
-
-***
-
-### 4. 工具方法
-
-#### 检查两玩家是否同 IP
-
-```java
-CompletableFuture<Boolean> sameIp = ALInviteAPI.isSameIp(Player p1, Player p2);
-```
-
-**返回值说明：**
-
-- `true` - 两玩家 IP 地址相同
-- `false` - IP 不同或任一玩家为 null
-
-***
-
-#### 解析 PlaceholderAPI 变量
-
-```java
-CompletableFuture<String> resolved = ALInviteAPI.resolvePlaceholders(String text, Player player);
-```
-
-**支持的变量：**
-
-- `{player}` - 玩家名称
-- `{invite_code}` - 玩家邀请码
-- `{total_invites}` - 邀请人数
-- 其他 PlaceholderAPI 变量
-
-**示例：**
-
-```java
-ALInviteAPI.resolvePlaceholders("恭喜 {player} 获得邀请码: {invite_code}", player)
-    .thenAccept(message -> {
-        Bukkit.broadcastMessage(message);
-    });
-```
-
-***
-
-### 5. 事件监听
-
-#### 监听邀请成功事件
-
-```java
-ALInviteAPI.registerInviteListener((inviterUuid, inviteeUuid) -> {
-    // 邀请人 UUID
-    // 被邀请人 UUID
-    getLogger().info("玩家 " + inviterUuid + " 成功邀请了 " + inviteeUuid);
+inviterFuture.thenAccept(inviterUuid -> {
+    if (inviterUuid != null) {
+        getLogger().info("玩家的邀请人是: " + inviterUuid);
+    } else {
+        getLogger().info("玩家没有邀请人");
+    }
 });
 ```
 
-**触发时机：**
+#### getInviterName - 获取邀请人名称
 
-- 当新玩家成功绑定邀请码并完成注册时触发
-
-***
-
-## 完整示例
-
-### 检查玩家邀请码并广播
-
+**方法签名：**
 ```java
-public void announceInviteCode(Player player) {
-    ALInviteAPI.getInviteCode(player).thenAccept(code -> {
-        if (code != null) {
-            Bukkit.broadcastMessage(player.getName() + " 的邀请码是 " + code + "，快去使用吧！");
-        } else {
-            player.sendMessage("你还没有邀请码");
-        }
-    });
-}
+public static CompletableFuture<String> getInviterName(UUID playerUuid)
 ```
 
-### 给予达到邀请里程碑的玩家特殊称号
+**参数说明：**
+- `playerUuid` - 玩家 UUID
 
+**返回值：**
+- `CompletableFuture<String>` - 邀请人的名称，如果无邀请人返回 "无"
+
+### 🔑 邀请码管理 API
+
+#### getInviteCode - 获取邀请码
+
+**方法签名：**
 ```java
-public void checkAndGrantTitle(Player player) {
-    ALInviteAPI.getTotalInvites(player).thenAccept(total -> {
-        if (total >= 10) {
-            // 给邀请了10人的玩家添加称号
-            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "lp user " + player.getName() + " permission set special.inviter true");
-        }
-    });
-}
+public static CompletableFuture<String> getInviteCode(UUID playerUuid)
 ```
 
-### 第三方插件检测老玩家
+**参数说明：**
+- `playerUuid` - 玩家 UUID
 
+**返回值：**
+- `CompletableFuture<String>` - 玩家的邀请码，如果无邀请码返回 `null`
+
+**使用示例：**
 ```java
-public boolean isVeteranPlayer(Player player) {
-    return ALInviteAPI.getInviteCode(player).thenApply(code -> code != null).join();
-}
-```
+UUID playerUuid = player.getUniqueId();
+CompletableFuture<String> codeFuture = ALInviteAPI.getInviteCode(playerUuid);
 
-***
-
-## 常见问题
-
-### Q: API 调用是同步还是异步？
-
-所有 API 方法都是**异步**的，返回 `CompletableFuture`。建议在异步线程中处理业务逻辑，如果需要同步等待，可以使用 `.join()` 方法：
-
-```java
-// 异步获取
-ALInviteAPI.getInviteCode(player).thenAccept(code -> {
-    // 在异步线程中处理
+codeFuture.thenAccept(code -> {
+    if (code != null) {
+        getLogger().info("玩家的邀请码是: " + code);
+    } else {
+        getLogger().info("玩家没有邀请码");
+    }
 });
-
-// 同步等待（谨慎使用，可能阻塞主线程）
-String code = ALInviteAPI.getInviteCode(player).join();
 ```
 
-### Q: 如何检查 ALInvite 是否安装？
+### 📊 邀请统计 API
+
+#### getTotalInvites - 获取总邀请人数
+
+**方法签名：**
+```java
+public static CompletableFuture<Integer> getTotalInvites(UUID playerUuid)
+```
+
+**参数说明：**
+- `playerUuid` - 玩家 UUID
+
+**返回值：**
+- `CompletableFuture<Integer>` - 总邀请人数
+
+**使用示例：**
+```java
+UUID playerUuid = player.getUniqueId();
+CompletableFuture<Integer> totalFuture = ALInviteAPI.getTotalInvites(playerUuid);
+
+totalFuture.thenAccept(total -> {
+    getLogger().info("玩家累计邀请人数: " + total);
+});
+```
+
+#### getTotalRebateAmount - 获取累计返点金额
+
+**方法签名：**
+```java
+public static CompletableFuture<Double> getTotalRebateAmount(UUID playerUuid)
+```
+
+**参数说明：**
+- `playerUuid` - 玩家 UUID
+
+**返回值：**
+- `CompletableFuture<Double>` - 累计返点金额
+
+### 🎁 礼包管理 API
+
+#### getPurchasedGift - 获取已购买礼包ID
+
+**方法签名：**
+```java
+public static CompletableFuture<String> getPurchasedGift(UUID playerUuid)
+```
+
+**参数说明：**
+- `playerUuid` - 玩家 UUID
+
+**返回值：**
+- `CompletableFuture<String>` - 已购买礼包的ID，如果未购买返回 `null`
+
+#### getActiveGift - 获取当前生效礼包配置
+
+**方法签名：**
+```java
+public static CompletableFuture<GiftManager.GiftConfig> getActiveGift(UUID playerUuid)
+```
+
+**参数说明：**
+- `playerUuid` - 玩家 UUID
+
+**返回值：**
+- `CompletableFuture<GiftManager.GiftConfig>` - 当前生效礼包的配置信息
+
+### 🔍 状态检查 API
+
+#### isPlayerBound - 检查玩家是否已绑定邀请码
+
+**方法签名：**
+```java
+public static CompletableFuture<Boolean> isPlayerBound(UUID playerUuid)
+```
+
+**参数说明：**
+- `playerUuid` - 玩家 UUID
+
+**返回值：**
+- `CompletableFuture<Boolean>` - `true` 表示已绑定，`false` 表示未绑定
+
+#### isSameIp - 检查两个玩家是否同一IP
+
+**方法签名：**
+```java
+public static CompletableFuture<Boolean> isSameIp(Player p1, Player p2)
+```
+
+**参数说明：**
+- `p1` - 玩家1
+- `p2` - 玩家2
+
+**返回值：**
+- `CompletableFuture<Boolean>` - `true` 表示同一IP，`false` 表示不同IP
+
+### 🛡️ 防重复检查 API
+
+#### checkRebateDuplicate - 检查跨服重复交易
+
+**方法签名：**
+```java
+public static CompletableFuture<Boolean> checkRebateDuplicate(UUID playerUuid, double amount)
+```
+
+**参数说明：**
+- `playerUuid` - 玩家 UUID
+- `amount` - 充值金额
+
+**返回值：**
+- `CompletableFuture<Boolean>` - `true` 表示重复交易，`false` 表示新交易
+
+## 💡 第三方插件集成示例
+
+### MinePay 集成示例
 
 ```java
-ALInvite plugin = (ALInvite) getServer().getPluginManager().getPlugin("ALInvite");
-if (plugin != null) {
-    // ALInvite 已安装
-    ALInviteAPI.init(plugin);
+import top.minepay.api.event.MinePaySuccessEvent;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+
+public class MinePayIntegration implements Listener {
+    
+    @EventHandler
+    public void onMinePaySuccess(MinePaySuccessEvent event) {
+        try {
+            // 获取订单信息
+            TradeInfo tradeInfo = event.getTradeInfo();
+            String playerName = tradeInfo.getPlayerName();
+            int priceInCents = tradeInfo.getPrice();
+            double pointsAmount = priceInCents / 100.0;
+            
+            // 只处理点券充值订单
+            if (tradeInfo.getTradeType() == TradeType.POINT) {
+                // 调用 ALInvite API 处理返点
+                CompletableFuture<Boolean> result = ALInviteAPI.processPointsRecharge(
+                    playerName, 
+                    pointsAmount
+                );
+                
+                result.thenAccept(success -> {
+                    if (success) {
+                        getLogger().info("MinePay充值返点处理成功: " + playerName);
+                    } else {
+                        getLogger().warning("MinePay充值返点处理失败: " + playerName);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            getLogger().severe("处理MinePay充值事件失败: " + e.getMessage());
+        }
+    }
 }
 ```
 
-### Q: 获取的邀请码为 null 是什么原因？
+### SweetCheckout 集成示例
 
-可能原因：
+```java
+import com.sweetcheckout.api.event.PaymentCompletedEvent;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 
-1. 玩家没有 `alinvite.veteran` 权限
-2. 玩家确实没有生成过邀请码
-3. 数据库中该玩家没有邀请码记录
+public class SweetCheckoutIntegration implements Listener {
+    
+    @EventHandler
+    public void onPaymentCompleted(PaymentCompletedEvent event) {
+        try {
+            String playerName = event.getPlayer().getName();
+            double pointsAmount = event.getAmount();
+            
+            // 调用 ALInvite API 处理返点
+            CompletableFuture<Boolean> result = ALInviteAPI.processPointsRecharge(
+                playerName, 
+                pointsAmount
+            );
+            
+            result.thenAccept(success -> {
+                if (success) {
+                    getLogger().info("SweetCheckout充值返点处理成功: " + playerName);
+                } else {
+                    getLogger().warning("SweetCheckout充值返点处理失败: " + playerName);
+                }
+            });
+        } catch (Exception e) {
+            getLogger().severe("处理SweetCheckout支付事件失败: " + e.getMessage());
+        }
+    }
+}
+```
 
-### Q: 如何联系开发者？
+### 自定义支付插件集成示例
 
-如有问题或建议，请通过以下方式联系：
+```java
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 
-- GitHub Issues: [AllenLinong/ALInvite： 邀请插件](https://github.com/AllenLinong/ALInvite)
-- QQ:1422163791
+public class CustomPaymentIntegration implements Listener {
+    
+    @EventHandler
+    public void onCustomPayment(CustomPaymentEvent event) {
+        try {
+            String playerName = event.getPlayerName();
+            double pointsAmount = event.getPointsAmount();
+            
+            // 调用 ALInvite API 处理返点
+            CompletableFuture<Boolean> result = ALInviteAPI.processPointsRecharge(
+                playerName, 
+                pointsAmount
+            );
+            
+            result.thenAccept(success -> {
+                if (success) {
+                    getLogger().info("自定义支付插件返点处理成功: " + playerName);
+                } else {
+                    getLogger().warning("自定义支付插件返点处理失败: " + playerName);
+                }
+            });
+        } catch (Exception e) {
+            getLogger().severe("处理自定义支付事件失败: " + e.getMessage());
+        }
+    }
+}
+```
+
+## ⚠️ 注意事项
+
+1. **异步处理**：所有 API 方法都是异步的，返回 `CompletableFuture`，请使用 `thenAccept()` 或 `thenApply()` 处理结果
+
+2. **错误处理**：建议对 API 调用进行错误处理，避免插件崩溃
+
+3. **权限检查**：调用 API 前请确保玩家有相应权限
+
+4. **数据一致性**：多个插件同时调用 API 时，建议使用同步机制避免数据竞争
+
+## 📞 技术支持
+
+如有 API 使用问题或集成需求，请联系：
+- **作者**：Allen_Linong
+- **QQ**：1422163791
 
 ***
 
-##
+*📅 最后更新：2026-04-21*
+*✨ 文档版本：v3.0（完整API版）*

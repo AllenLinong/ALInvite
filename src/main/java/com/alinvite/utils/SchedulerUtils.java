@@ -12,7 +12,13 @@ public class SchedulerUtils {
 
     static {
         String serverName = Bukkit.getServer().getName();
-        IS_FOLIA = serverName != null && serverName.equalsIgnoreCase("Folia");
+        String serverVersion = Bukkit.getVersion();
+        
+        // 检测Folia及其衍生版本（包括Luminol）
+        IS_FOLIA = (serverName != null && (serverName.equalsIgnoreCase("Folia") || 
+                   serverName.toLowerCase().contains("folia") ||
+                   serverName.toLowerCase().contains("luminol"))) ||
+                   (serverVersion != null && serverVersion.toLowerCase().contains("folia"));
     }
 
     public static boolean isFolia() {
@@ -53,7 +59,8 @@ public class SchedulerUtils {
 
     public static void runTaskAsynchronously(Plugin plugin, Runnable runnable) {
         if (isFolia()) {
-            runTaskAsyncFolia(plugin, runnable);
+            // Folia中直接在主线程执行，避免异步问题
+            runTask(plugin, runnable);
         } else {
             Bukkit.getScheduler().runTaskAsynchronously(plugin, runnable);
         }
@@ -61,62 +68,70 @@ public class SchedulerUtils {
 
     public static void runTaskTimer(Plugin plugin, Runnable runnable, long delay, long period) {
         if (isFolia()) {
-            runTaskTimerFolia(plugin, runnable, delay, period);
+            // Folia中直接使用延迟任务循环替代定时任务
+            runTaskLater(plugin, () -> {
+                runnable.run();
+                runTaskTimer(plugin, runnable, period, period);
+            }, delay);
         } else {
             Bukkit.getScheduler().runTaskTimer(plugin, runnable, delay, period);
+        }
+    }
+
+    public static void runTaskLaterAsync(Plugin plugin, Runnable runnable, long delay) {
+        if (isFolia()) {
+            // Folia中直接使用同步延迟任务，避免异步问题
+            runTaskLater(plugin, runnable, delay);
+        } else {
+            Bukkit.getScheduler().runTaskLater(plugin, runnable, delay);
         }
     }
 
     public static void runTaskTimerAsync(Plugin plugin, Runnable runnable, long delay, long period) {
         if (isFolia()) {
-            runTaskTimerAsyncFolia(plugin, runnable, delay, period);
+            // Folia不支持异步定时任务，使用同步定时任务替代
+            runTaskTimer(plugin, runnable, delay, period);
         } else {
             Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, runnable, delay, period);
         }
     }
 
+    // Folia专用方法 - 完全避免传统调度器
     private static void runTaskFolia(Plugin plugin, Runnable runnable) {
         try {
-            Object scheduler = Bukkit.class.getMethod("getGlobalRegionScheduler").invoke(null);
-            scheduler.getClass().getMethod("runTask", Plugin.class, Runnable.class).invoke(scheduler, plugin, runnable);
+            // 直接在主线程执行
+            if (Bukkit.isPrimaryThread()) {
+                runnable.run();
+            } else {
+                // 使用Folia的GlobalRegionScheduler
+                Object scheduler = Bukkit.class.getMethod("getGlobalRegionScheduler").invoke(null);
+                scheduler.getClass().getMethod("run", Plugin.class, java.util.function.Consumer.class)
+                    .invoke(scheduler, plugin, (java.util.function.Consumer<Object>) task -> runnable.run());
+            }
         } catch (Exception e) {
-            Bukkit.getScheduler().runTask(plugin, runnable);
+            plugin.getLogger().warning("Folia任务执行失败: " + e.getMessage());
+            // 备用方案：直接在新线程执行
+            new Thread(runnable).start();
         }
     }
 
     private static void runTaskLaterFolia(Plugin plugin, Runnable runnable, long delay) {
         try {
+            // 使用Folia的GlobalRegionScheduler的延迟任务
             Object scheduler = Bukkit.class.getMethod("getGlobalRegionScheduler").invoke(null);
-            scheduler.getClass().getMethod("runTaskLater", Plugin.class, Runnable.class, long.class).invoke(scheduler, plugin, runnable, delay);
+            scheduler.getClass().getMethod("runDelayed", Plugin.class, java.util.function.Consumer.class, long.class)
+                .invoke(scheduler, plugin, (java.util.function.Consumer<Object>) task -> runnable.run(), delay);
         } catch (Exception e) {
-            Bukkit.getScheduler().runTaskLater(plugin, runnable, delay);
-        }
-    }
-
-    private static void runTaskAsyncFolia(Plugin plugin, Runnable runnable) {
-        try {
-            Object scheduler = Bukkit.class.getMethod("getGlobalRegionScheduler").invoke(null);
-            scheduler.getClass().getMethod("runTaskAsynchronously", Plugin.class, Runnable.class).invoke(scheduler, plugin, runnable);
-        } catch (Exception e) {
-            Bukkit.getScheduler().runTaskAsynchronously(plugin, runnable);
-        }
-    }
-
-    private static void runTaskTimerFolia(Plugin plugin, Runnable runnable, long delay, long period) {
-        try {
-            Object scheduler = Bukkit.class.getMethod("getGlobalRegionScheduler").invoke(null);
-            scheduler.getClass().getMethod("runTaskTimer", Plugin.class, Runnable.class, long.class, long.class).invoke(scheduler, plugin, runnable, delay, period);
-        } catch (Exception e) {
-            Bukkit.getScheduler().runTaskTimer(plugin, runnable, delay, period);
-        }
-    }
-
-    private static void runTaskTimerAsyncFolia(Plugin plugin, Runnable runnable, long delay, long period) {
-        try {
-            Object scheduler = Bukkit.class.getMethod("getGlobalRegionScheduler").invoke(null);
-            scheduler.getClass().getMethod("runTaskTimerAsynchronously", Plugin.class, Runnable.class, long.class, long.class).invoke(scheduler, plugin, runnable, delay, period);
-        } catch (Exception e) {
-            Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, runnable, delay, period);
+            plugin.getLogger().warning("Folia延迟任务执行失败: " + e.getMessage());
+            // 备用方案：使用Thread.sleep
+            new Thread(() -> {
+                try {
+                    Thread.sleep(delay * 50); // 转换为毫秒
+                    runnable.run();
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+            }).start();
         }
     }
 }

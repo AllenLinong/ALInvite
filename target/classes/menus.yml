@@ -30,6 +30,7 @@ main_menu:
         - "&7查看你的邀请统计"
         - "&7领取累计奖励"
         - "&7你的邀请码: &e&n{invite_code}"  # {invite_code} = 玩家自己的邀请码
+        - "&7累计获得返点: &e{total_rebate} 点券"  # {total_rebate} = 累计获得的充值返点数量
         - "&7邀请更多玩家领取里程碑奖励"
         - "&7未解锁请升级玩家等级&aLV.2"
       action: "OPEN_VETERAN"                # 打开邀请中心菜单

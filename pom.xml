@@ -6,7 +6,7 @@
 
     <groupId>com.alinvite</groupId>
     <artifactId>ALInvite</artifactId>
-    <version>1.0.5</version>
+    <version>1.0.7</version>
     <packaging>jar</packaging>
 
     <name>ALInvite</name>
@@ -15,7 +15,7 @@
     <properties>
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <minecraft.version.range>[1.20.4,1.21.11]</minecraft.version.range>
+        <minecraft.version.range>[1.20.1,1.21.11]</minecraft.version.range>
     </properties>
 
     <repositories>
@@ -158,6 +158,13 @@
                                     <mainClass>com.alinvite.ALInvite</mainClass>
                                 </transformer>
                             </transformers>
+                            <artifactSet>
+                                <includes>
+                                    <include>com.github.ben-manes.caffeine:caffeine</include>
+                                    <include>com.zaxxer:HikariCP</include>
+                                    <include>org.slf4j:slf4j-api</include>
+                                </includes>
+                            </artifactSet>
                         </configuration>
                     </execution>
                 </executions>

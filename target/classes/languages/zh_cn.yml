@@ -51,6 +51,10 @@ errors:
   veteran_cannot_bind: "&c你已经是老玩家，不能绑定其他老玩家的邀请码"
   no_invite_code: "&c你暂时未解锁邀请码"
 
+
+points_rebate:
+  rebate_given: "&a您邀请的新人 &e{player}&a 充值了 &6{amount}&a 点券，您获得了 &e{rebate_amount}&a 点返点" 
+
 milestone:
   reached: "&a恭喜！你达到了 {name} 里程碑，获得奖励！"
   already_claimed: "&c你已经领取过此里程碑奖励"

@@ -81,7 +81,14 @@ public class PlaceholderResolver {
                 return placeholders;
             });
 
-        return CompletableFuture.allOf(codeFuture, bindFuture, inviterFuture, totalFuture, giftFuture, hasGiftFuture, nextMilestoneFuture)
+        CompletableFuture<Map<String, String>> totalRebateFuture = getTotalRebateAsync(uuid)
+            .thenApply(totalRebate -> {
+                placeholders.put("{total_rebate}", totalRebate);
+                placeholders.put("%alinvite_total_rebate%", totalRebate);
+                return placeholders;
+            });
+
+        return CompletableFuture.allOf(codeFuture, bindFuture, inviterFuture, totalFuture, giftFuture, hasGiftFuture, nextMilestoneFuture, totalRebateFuture)
             .thenApply(v -> {
                 customReplacements.forEach((key, value) -> placeholders.put(key, value));
                 return placeholders;
@@ -123,6 +130,10 @@ public class PlaceholderResolver {
         String nextMilestone = getNextMilestoneSync(uuid);
         result = result.replace("{next_milestone}", nextMilestone)
                      .replace("%alinvite_next_milestone%", nextMilestone);
+
+        String totalRebate = getTotalRebateSync(uuid);
+        result = result.replace("{total_rebate}", totalRebate)
+                     .replace("%alinvite_total_rebate%", totalRebate);
 
         for (Map.Entry<String, String> entry : customReplacements.entrySet()) {
             result = result.replace(entry.getKey(), entry.getValue());
@@ -282,5 +293,25 @@ public class PlaceholderResolver {
             }
         }
         return "MAX";
+    }
+
+    public CompletableFuture<String> getTotalRebateAsync(UUID uuid) {
+        return CompletableFuture.supplyAsync(() -> getTotalRebateSync(uuid));
+    }
+
+    public String getTotalRebateSync(UUID uuid) {
+        try {
+            // 从数据库获取累计返点总额
+            Double totalRebate = plugin.getDatabaseManager().getTotalRebateAmount(uuid).join();
+            // 如果为null或NaN，返回0.00
+            if (totalRebate == null || totalRebate.isNaN()) {
+                return "0.00";
+            }
+            // 格式化显示，保留2位小数
+            return String.format("%.2f", totalRebate);
+        } catch (Exception e) {
+            plugin.getLogger().warning("获取累计返点总额失败: " + e.getMessage());
+            return "0.00";
+        }
     }
 }

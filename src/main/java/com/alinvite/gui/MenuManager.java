@@ -180,7 +180,7 @@ public class MenuManager {
                 } else {
                     ButtonConfig btn = config.buttons.get(String.valueOf(c));
                     if (btn != null) {
-                        inventory.setItem(slot, createMainButtonItem(btn, bindStatus, inviterName, inviteCode));
+                        inventory.setItem(slot, createMainButtonItem(player, btn, bindStatus, inviterName, inviteCode));
                     }
                 }
                 slot++;
@@ -191,21 +191,30 @@ public class MenuManager {
         });
     }
 
-    private ItemStack createMainButtonItem(ButtonConfig btn, String bindStatus, String inviterName, String inviteCode) {
+    private ItemStack createMainButtonItem(Player player, ButtonConfig btn, String bindStatus, String inviterName, String inviteCode) {
         String displayCode = inviteCode != null ? inviteCode : "无";
         ItemStack item = new ItemStack(Material.valueOf(btn.material));
         ItemMeta meta = item.getItemMeta();
-        String name = ConfigManager.colorize(btn.name)
+        
+        // 先应用占位符替换，再替换其他变量
+        String name = placeholderResolver.applyPlaceholders(btn.name, player)
                 .replace("{bind_status}", bindStatus)
                 .replace("{inviter_name}", inviterName)
                 .replace("{invite_code}", displayCode);
-        meta.setDisplayName(name);
+        name = ConfigManager.colorize(name);
+        
         List<String> lore = btn.lore.stream()
-                .map(s -> ConfigManager.colorize(s)
-                        .replace("{bind_status}", bindStatus)
-                        .replace("{inviter_name}", inviterName)
-                        .replace("{invite_code}", displayCode))
+                .map(s -> {
+                    // 先应用占位符替换，再替换其他变量
+                    String processed = placeholderResolver.applyPlaceholders(s, player)
+                            .replace("{bind_status}", bindStatus)
+                            .replace("{inviter_name}", inviterName)
+                            .replace("{invite_code}", displayCode);
+                    return ConfigManager.colorize(processed);
+                })
                 .toList();
+        
+        meta.setDisplayName(name);
         meta.setLore(lore);
         if (btn.customModelData > 0) {
             meta.setCustomModelData(btn.customModelData);

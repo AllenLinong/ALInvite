@@ -48,25 +48,19 @@ milestones:
   1:
     name: "社交新星"             # 里程碑称号（会显示在公告和奖励说明中）
     lore:                        # 里程碑奖励的描述（显示在菜单中）
-      - "&b1000 EMC积分"
       - "&a100 金币"
       - "&b10 点券"
     rewards:                     # 里程碑奖励列表（达到条件时自动发放）
-      - type: "command"          # 奖励类型：command（执行命令）、money（金币）、points（点券）、item（物品）
-        value: "alex give %player% 1000"  # command 类型的值：命令（%player% 会替换为玩家名）
-      - type: "money"
-        value: 100               # money 类型的值：金币数量
+      - type: "money"            # 奖励类型：command（执行命令）、money（金币）、points（点券）、item（物品）
+        value: 100               # money 类型的值：金币数量 command 类型的值：命令（%player% 会替换为玩家名）
       - type: "points"
         value: 10                # points 类型的值：点券数量
   5:
     name: "社交达人"
     lore:
-      - "&b10000 EMC积分"
       - "&a500 金币"
       - "&b50 点券"
     rewards:
-      - type: "command"
-        value: "alex give %player% 10000"
       - type: "money"
         value: 5000
       - type: "points"
@@ -74,12 +68,9 @@ milestones:
   10:
     name: "社交传奇"
     lore:
-      - "&b100000 EMC积分"
       - "&a10000 金币"
       - "&b1000 点券"
     rewards:
-      - type: "command"
-        value: "alex give %player% 100000"
       - type: "money"
         value: 10000
       - type: "points"
@@ -294,6 +285,76 @@ permission_group_rewards:
       money: 2000
       points: 200
       weight: 6
+
+# ==================== 点券充值返点 ====================
+# 使用 /alinvite givedj 命令为玩家充值点券，给邀请人发放返点奖励
+# 第三方支付插件（如MinePay、SweetCheckout）充值也会自动触发返点
+points_rebate:
+  enabled: true                 # 是否启用点券充值返点功能
+  # true: 启用返点功能（第三方支付插件充值时会自动发放返点）
+  # false: 禁用返点功能
+  
+  # 点券发放命令（当玩家充值成功时执行此命令发放点券）
+  points_command: "points give {player} {amount}"  # {player} 替换为玩家名，{amount} 替换为点券数量
+  
+  # 权限前缀配置
+  permission_prefix: "alinvite.rebate"  # 返点权限前缀
+  # 权限节点格式：权限前缀.权限组名称
+  # 例如设置为 "alinvite.rebate" 则检测 "alinvite.rebate.vip" 权限
+  # 邀请人需要拥有对应的权限节点才能获得相应返点比例
+  
+  # 返点比例配置（基于权限组）
+  # 格式：权限组名称 -> 返点比例配置
+  # 当邀请人拥有对应权限组时，使用该组的返点比例
+  # weight: 权重数值，越大约先检测（用于处理权限继承问题，数值高的权限组优先）
+  # 当玩家同时拥有多个权限组时，使用权重最高的返点比例
+  # 
+  # 返点逻辑：
+  # 1. 所有玩家默认获得5%返点（无需任何权限）
+  # 2. 拥有权限的玩家获得更高比例返点
+  # 
+  # 权限节点说明：
+  # - 所有玩家默认获得5%返点（无需权限）
+  # - VIP玩家需要拥有 alinvite.rebate.vip 权限才能获得15%返点
+  # - 超级VIP玩家需要拥有 alinvite.rebate.svip 权限才能获得20%返点
+  # - 至尊VIP玩家需要拥有 alinvite.rebate.mvip 权限才能获得25%返点
+  # - 管理员需要拥有 alinvite.rebate.admin 权限（返点比例为0%）
+  rebate_rates:
+    base:
+      rate: 0.05                # 5%返点比例（所有玩家默认，无需给玩家分配 alinvite.rebate.base 权限）
+      weight: 0                  # 最低权重，确保所有玩家都有默认返点
+    vip:
+      rate: 0.15                # 15%返点比例（VIP玩家）
+      weight: 2
+    svip:
+      rate: 0.20                # 20%返点比例（超级VIP玩家）
+      weight: 3
+    mvip:
+      rate: 0.25                # 25%返点比例（至尊VIP玩家）
+      weight: 4
+    admin:
+      rate: 0.00                # 0%返点比例（管理员不返点）
+      weight: 5
+  
+  # 限制设置
+  limits:
+    min_amount: 10.0            # 最小充值金额（小于此金额的充值不触发返点）
+    max_rebate_per_day: 1000.0  # 单个玩家每日最大返点金额（防止刷返点）
+    
+  # 第三方支付插件集成
+  third_party:
+    minepay_enabled: true       # 是否启用MinePay集成
+    sweetcheckout_enabled: true # 是否启用SweetCheckout集成
+    
+  # 防重复机制
+  anti_duplicate:
+    enabled: true               # 是否启用防重复充值检查
+    time_window: 10            # 时间窗口（秒），在此时间内相同金额的充值视为重复
+  
+  # 返点限制
+  limits:
+    min_amount: 10.0           # 最低充值金额（小于此金额的充值不触发返点）
+    max_rebate_per_day: 1000.0  # 每日返点上限（单个邀请人一天内最多获得1000点券返点）
 
 # ==================== 调试 ====================
 debug: false                    # 是否输出调试日志

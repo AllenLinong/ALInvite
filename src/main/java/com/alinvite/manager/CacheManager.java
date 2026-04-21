@@ -26,26 +26,57 @@ public class CacheManager {
         int codeTtl = plugin.getConfigManager().getConfig().getInt("performance.cache_invite_code_ttl", 30);
         int statsTtl = plugin.getConfigManager().getConfig().getInt("performance.cache_stats_ttl", 30);
         int giftTtl = plugin.getConfigManager().getConfig().getInt("performance.cache_gift_ttl", 60);
+        
+        // 动态计算缓存大小，基于服务器规模
+        int cacheSize = calculateOptimalCacheSize();
+        
+        plugin.getLogger().info("初始化缓存 - 缓存大小: " + cacheSize);
 
         inviteCodeCache = Caffeine.newBuilder()
             .expireAfterWrite(codeTtl, TimeUnit.MINUTES)
-            .maximumSize(1000)
+            .maximumSize(cacheSize)
+            .recordStats() // 启用统计信息
             .build();
 
         statsCache = Caffeine.newBuilder()
             .expireAfterWrite(statsTtl, TimeUnit.MINUTES)
-            .maximumSize(1000)
+            .maximumSize(cacheSize)
+            .recordStats()
             .build();
 
         giftCache = Caffeine.newBuilder()
             .expireAfterWrite(giftTtl, TimeUnit.MINUTES)
-            .maximumSize(1000)
+            .maximumSize(cacheSize)
+            .recordStats()
             .build();
 
         ipCheckCache = Caffeine.newBuilder()
             .expireAfterWrite(5, TimeUnit.MINUTES)
-            .maximumSize(500)
+            .maximumSize(Math.max(500, cacheSize / 2))
+            .recordStats()
             .build();
+    }
+    
+    /**
+     * 计算最优缓存大小
+     */
+    private int calculateOptimalCacheSize() {
+        int maxPlayers = org.bukkit.Bukkit.getMaxPlayers();
+        
+        // 基础缓存大小
+        int baseSize = 1000;
+        
+        // 根据服务器规模调整
+        if (maxPlayers > 100) {
+            // 大型服务器：缓存大小为最大玩家数的3倍
+            return Math.max(baseSize, maxPlayers * 3);
+        } else if (maxPlayers > 50) {
+            // 中型服务器：缓存大小为最大玩家数的2倍
+            return Math.max(baseSize, maxPlayers * 2);
+        } else {
+            // 小型服务器：使用基础大小
+            return baseSize;
+        }
     }
 
     public String getInviteCode(UUID uuid) {

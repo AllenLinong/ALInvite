@@ -1,0 +1,27 @@
+name: ALInvite
+version: 1.0.7
+main: com.alinvite.ALInvite
+api-version: '1.20'
+author: Allen_Linong
+description: 邀请新玩家入服的激励系统插件
+folia-supported: true
+website: https://github.com/AllenLinong/ALInvite
+load: STARTUP
+
+commands:
+  alinvite:
+    description: ALInvite 主命令
+    usage: /<command> [args]
+    aliases: [ali, invite]
+    permission: alinvite.use
+
+permissions:
+  alinvite.use:
+    description: 允许使用主命令和查看菜单
+    default: true
+  alinvite.buygift:
+    description: 允许购买礼包
+    default: true
+  alinvite.admin:
+    description: 管理员权限
+    default: op

@@ -187,6 +187,7 @@ main_menu:
 | 命令                  | 权限                 | 描述       |
 | ------------------- | ------------------ | -------- |
 | `/alinvite`         | `alinvite.use`     | 打开主菜单    |
+| `/alinvite bind <邀请码>`    | `alinvite.use`     | 直接绑定邀请码    |
 | `/alinvite code`    | `alinvite.use`     | 查看自己的邀请码 |
 | `/alinvite stats`   | `alinvite.use`     | 查看邀请统计信息 |
 | `/alinvite buygift` | `alinvite.buygift` | 打开礼包商店   |

@@ -4,6 +4,27 @@
 
 **ALInvite** 是一个功能强大的我的世界服务器邀请系统插件，旨在通过激励玩家邀请新玩家加入服务器，促进服务器人口增长和社区活跃度。插件支持多语言、自定义菜单、礼包商店、里程碑奖励等丰富功能，完全兼容 Folia 多线程服务器。
 
+## 📅 更新日志
+
+### v1.1.1 (2026-04-25)
+
+**修复内容**：
+
+- 修复了 `InventoryView` 兼容性问题，解决了 1.20.1 服务器上的 `IncompatibleClassChangeError` 错误
+- 优化了控制台颜色显示，确保彩色输出正常
+
+**新增功能**：
+
+- 支持礼包购买时限设置，可在配置文件中为每个礼包设置 `duration_days` 参数
+- 实现了礼包过期自动检查，过期后会自动切换到玩家拥有的最高等级礼包
+- 添加了礼包状态变量：`%alinvite_gift_status%` 和 `%alinvite_gift_remaining_days%`
+- 支持在菜单 lore 中使用其他插件的 PlaceholderAPI 变量
+
+**兼容性**：
+
+- 支持 Minecraft 1.20.1 - 1.21.11 版本
+- 兼容 Purpur 等主流服务器核心
+
 ### ✨ 主要特性
 
 | 功能模块                  | 描述                        |
@@ -28,7 +49,7 @@
 
 | 项目                  | 要求                           |
 | ------------------- | ---------------------------- |
-| **Minecraft 服务器版本** | 1.20.4+                      |
+| **Minecraft 服务器版本** | 1.20.1 - 1.21.11             |
 | **Java 版本**         | **21+**                      |
 | **服务器类型**           | 支持 Folia（推荐）或 Paper          |
 | **可选依赖**            | PlaceholderAPI、LuckPerms（可选） |
@@ -111,6 +132,7 @@ gift_shop:
       material: "GOLD_INGOT"
       price_money: 0            # 金币价格
       price_points: 0           # 点券价格
+      duration_days: 0          # 购买时限：天数（0 表示永久）
       rewards:                  # 新玩家奖励
         - type: "money"
           value: 50
@@ -221,15 +243,17 @@ main_menu:
 
 #### 基础信息占位符
 
-| 占位符                        | 描述             | 示例             |
-| -------------------------- | -------------- | -------------- |
-| `%alinvite_code%`          | 玩家邀请码          | `ABC123`       |
-| `%alinvite_total%`         | 累计邀请人数         | `5`            |
-| `%alinvite_total_invites%` | 累计邀请人数（同total） | `5`            |
-| `%alinvite_gift_name%`     | 当前礼包名称         | `基础礼包`         |
-| `%alinvite_has_gift%`      | 是否拥有礼包         | `true`/`false` |
-| `%alinvite_bind_status%`   | 绑定状态           | `已绑定`/`未绑定`    |
-| `%alinvite_inviter_name%`  | 邀请人名称          | `PlayerName`   |
+| 占位符                              | 描述             | 示例                |
+| -------------------------------- | -------------- | ----------------- |
+| `%alinvite_code%`                | 玩家邀请码          | `ABC123`          |
+| `%alinvite_total%`               | 累计邀请人数         | `5`               |
+| `%alinvite_total_invites%`       | 累计邀请人数（同total） | `5`               |
+| `%alinvite_gift_name%`           | 当前礼包名称         | `基础礼包`            |
+| `%alinvite_has_gift%`            | 是否拥有礼包         | `true`/`false`    |
+| `%alinvite_gift_status%`         | 礼包状态           | `已购买`/`未购买`/`已过期` |
+| `%alinvite_gift_remaining_days%` | 礼包剩余天数         | `30天`/`永久`/`未购买`  |
+| `%alinvite_bind_status%`         | 绑定状态           | `已绑定`/`未绑定`       |
+| `%alinvite_inviter_name%`        | 邀请人名称          | `PlayerName`      |
 
 #### 里程碑相关占位符
 

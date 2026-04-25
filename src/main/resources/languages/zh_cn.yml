@@ -52,6 +52,7 @@ commands:
   help: |
     &6===== ALInvite 指令帮助 =====
     &e/alinvite &7- 打开邀请菜单
+    &e/alinvite bind <邀请码> &7- 直接绑定邀请码
     &e/alinvite code &7- 查看你的邀请码
     &e/alinvite stats &7- 查看邀请统计
     &6===== ALInvite 管理员指令 =====

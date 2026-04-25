@@ -52,6 +52,7 @@ commands:
   help: |
     &6===== ALInvite Commands =====
     &e/alinvite &7- Open invite menu
+    &e/alinvite bind <code> &7- Bind invite code directly
     &e/alinvite code &7- View your invite code
     &e/alinvite stats &7- View invite stats
     &6===== ALInvite Admin Commands =====

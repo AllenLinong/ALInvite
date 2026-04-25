@@ -42,6 +42,7 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
 
         switch (subCommand) {
             case "code" -> handleCode(sender);
+            case "bind" -> handleBind(sender, args);
             case "stats" -> handleStats(sender);
             case "contrib" -> handleContribution(sender);
             case "buygift" -> handleBuyGift(sender);
@@ -83,6 +84,47 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
         }).thenAccept(code -> {
             String message = plugin.getConfigManager().getMessage("commands.code").replace("{invite_code}", code);
             player.sendMessage(message);
+        });
+    }
+
+    private void handleBind(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(plugin.getConfigManager().getMessage("errors.player_only"));
+            return;
+        }
+
+        if (!player.hasPermission("alinvite.use")) {
+            player.sendMessage(plugin.getConfigManager().getMessage("errors.no_permission"));
+            return;
+        }
+
+        if (args.length < 2) {
+            player.sendMessage(ConfigManager.colorize("&c请输入邀请码！用法: /alinvite bind <邀请码>"));
+            return;
+        }
+
+        String code = args[1].trim().toUpperCase();
+
+        if (code.isEmpty()) {
+            player.sendMessage(ConfigManager.colorize("&c邀请码不能为空！"));
+            return;
+        }
+
+        plugin.getInviteManager().bindInviteCode(player, code).thenAccept(result -> {
+            if (result.success) {
+                player.sendMessage(plugin.getConfigManager().getMessage("dialog.success"));
+            } else {
+                String reason = switch (result.type) {
+                    case NO_PERMISSION -> plugin.getConfigManager().getMessage("errors.no_permission");
+                    case CODE_NOT_FOUND -> plugin.getConfigManager().getMessage("dialog.fail");
+                    case ALREADY_USED -> plugin.getConfigManager().getMessage("errors.already_used");
+                    case IP_LIMIT -> plugin.getConfigManager().getMessage("dialog.ip_limit");
+                    case SELF_INVITE -> plugin.getConfigManager().getMessage("dialog.self_invite");
+                    case VETERAN_CANNOT_BIND -> plugin.getConfigManager().getMessage("errors.veteran_cannot_bind");
+                    default -> plugin.getConfigManager().getMessage("dialog.fail");
+                };
+                player.sendMessage(reason);
+            }
         });
     }
 

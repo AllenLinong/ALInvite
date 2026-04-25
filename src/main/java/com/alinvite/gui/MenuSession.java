@@ -54,7 +54,7 @@ public class MenuSession {
         }
         try {
             return player.getOpenInventory() != null && player.getOpenInventory().getTopInventory() != null;
-        } catch (Exception e) {
+        } catch (Throwable t) {
             return false;
         }
     }

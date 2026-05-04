@@ -21,7 +21,7 @@ public class MilestoneManager {
 
     public MilestoneManager(ALInvite plugin) {
         this.plugin = plugin;
-        this.milestones = new HashMap<>();
+        this.milestones = new TreeMap<>();
         loadMilestones();
     }
 

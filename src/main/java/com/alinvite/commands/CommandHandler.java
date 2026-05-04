@@ -99,7 +99,7 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
         }
 
         if (args.length < 2) {
-            player.sendMessage(ConfigManager.colorize("&c请输入邀请码！用法: /alinvite bind <邀请码>"));
+            plugin.getMenuListener().startCodeInput(player);
             return;
         }
 

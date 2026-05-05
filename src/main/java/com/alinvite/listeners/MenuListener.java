@@ -50,48 +50,62 @@ public class MenuListener implements Listener {
         UUID uuid = player.getUniqueId();
         MenuSession session = MenuSessionManager.getInstance().getSession(player);
         
-        // 检查是否是我们的菜单界面
+        // 检查是否是我们的菜单界面 - 通过 holder 检查
         Inventory clickedInventory = event.getInventory();
-        if (clickedInventory.getHolder() instanceof com.alinvite.gui.MenuHolder || 
-            clickedInventory.getHolder() instanceof com.alinvite.gui.MenuManager.MenuHolder) {
-            // 对于我们的菜单，总是取消事件
+        boolean hasValidHolder = clickedInventory.getHolder() instanceof com.alinvite.gui.MenuHolder;
+        
+        if (isDebug()) {
+            plugin.getLogger().info("[DEBUG] onInventoryClick - player: " + player.getName());
+            plugin.getLogger().info("[DEBUG] hasValidHolder: " + hasValidHolder);
+            plugin.getLogger().info("[DEBUG] session != null: " + (session != null));
+            if (session != null) {
+                plugin.getLogger().info("[DEBUG] session menuType: " + session.getMenuType());
+                plugin.getLogger().info("[DEBUG] session.isValid(): " + session.isValid());
+            }
+            plugin.getLogger().info("[DEBUG] clickedInventory: " + clickedInventory);
+            plugin.getLogger().info("[DEBUG] event.getRawSlot(): " + event.getRawSlot());
+            plugin.getLogger().info("[DEBUG] event.getSlot(): " + event.getSlot());
+        }
+        
+        // 如果玩家打开了我们的菜单，取消所有点击事件（防止操作玩家背包）
+        if (hasValidHolder) {
             event.setCancelled(true);
             
+            // 检查 session 是否有效
             if (session == null || !session.isValid()) {
+                if (isDebug()) plugin.getLogger().info("[DEBUG] session is null or invalid, removing");
                 MenuSessionManager.getInstance().removeSession(player);
                 return;
             }
-
-            // 检查会话是否有效，不检查 inventory 对象是否相同
-            // 因为异步加载菜单时，inventory 对象可能会变化
-        } else {
-            // 不是我们的菜单，不处理
-            return;
-        }
-
-        int slot = event.getRawSlot();
-        if (slot < 0 || slot >= clickedInventory.getSize()) {
-            return;
-        }
-
-        ItemStack item = clickedInventory.getItem(slot);
-        if (item == null || item.getType() == Material.AIR) {
-            return;
-        }
-
-        String menuType = session.getMenuType();
-        if (isDebug()) plugin.getLogger().info("[DEBUG] Clicked - menuType: " + menuType + ", slot: " + slot);
-
-        switch (menuType) {
-            case "main" -> handleMainMenuClick(player, slot, session);
-            case "veteran" -> handleVeteranMenuClick(player, slot, session);
-            case "shop" -> handleShopMenuClick(player, slot, session);
-            default -> {
-                // 处理排行榜菜单
-                if (event.getView().getTitle().contains("排行榜")) {
-                    handleLeaderboardMenuClick(player, slot, event);
-                }
+            
+            // 使用 rawSlot 来确定点击位置，确保点击在菜单区域内
+            int rawSlot = event.getRawSlot();
+            // 检查点击是否发生在菜单库存区域（rawSlot < 菜单大小）
+            if (rawSlot < 0 || rawSlot >= clickedInventory.getSize()) {
+                if (isDebug()) plugin.getLogger().info("[DEBUG] slot out of bounds: " + rawSlot + ", menu size: " + clickedInventory.getSize());
+                return;
             }
+
+            ItemStack item = clickedInventory.getItem(rawSlot);
+            if (item == null || item.getType() == Material.AIR) {
+                if (isDebug()) plugin.getLogger().info("[DEBUG] item is null or air at slot " + rawSlot);
+                return;
+            }
+
+            String menuType = session.getMenuType();
+            if (isDebug()) plugin.getLogger().info("[DEBUG] Clicked - menuType: " + menuType + ", slot: " + rawSlot);
+
+            switch (menuType) {
+                case "main" -> handleMainMenuClick(player, rawSlot, session);
+                case "veteran" -> handleVeteranMenuClick(player, rawSlot, session);
+                case "shop" -> handleShopMenuClick(player, rawSlot, session);
+            }
+            return;
+        }
+        
+        // 如果不是我们的菜单但玩家有打开的菜单会话，也取消点击（阻止操作背包）
+        if (session != null && session.isValid()) {
+            event.setCancelled(true);
         }
     }
 
@@ -104,24 +118,10 @@ public class MenuListener implements Listener {
         UUID uuid = player.getUniqueId();
         MenuSession session = MenuSessionManager.getInstance().getSession(player);
 
-        // 检查是否是我们的菜单界面
-        Inventory draggedInventory = event.getInventory();
-        if (draggedInventory.getHolder() instanceof com.alinvite.gui.MenuHolder || 
-            draggedInventory.getHolder() instanceof com.alinvite.gui.MenuManager.MenuHolder) {
+        // 检查是否是我们的菜单界面 - 先检查 session
+        if (session != null && session.isValid()) {
             // 对于我们的菜单，总是取消事件
             event.setCancelled(true);
-            
-            if (session == null || !session.isValid()) {
-                MenuSessionManager.getInstance().removeSession(player);
-                return;
-            }
-
-            if (session.getInventory() != draggedInventory) {
-                return;
-            }
-        } else {
-            // 不是我们的菜单，不处理
-            return;
         }
     }
 
@@ -155,6 +155,8 @@ public class MenuListener implements Listener {
             case "INPUT_CODE" -> startCodeInput(player);
             case "OPEN_VETERAN" -> plugin.getMenuManager().openVeteranMenu(player);
             case "OPEN_SHOP" -> plugin.getMenuManager().openShopMenu(player);
+            case "OPEN_MAIN" -> plugin.getMenuManager().openMainMenu(player);
+            case "CLOSE" -> player.closeInventory();
         }
     }
 

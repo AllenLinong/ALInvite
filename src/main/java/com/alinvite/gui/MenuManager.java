@@ -97,6 +97,7 @@ public class MenuManager {
     }
 
     public void openMainMenu(Player player) {
+        plugin.getLogger().info("[DEBUG] openMainMenu called for player: " + player.getName());
         openMenu(player, "main_menu", "main");
     }
 
@@ -109,44 +110,49 @@ public class MenuManager {
     }
 
     private void openMenu(Player player, String menuName, String menuKey) {
+        plugin.getLogger().info("[DEBUG] openMenu called - player: " + player.getName() + ", menuName: " + menuName + ", menuKey: " + menuKey);
         MenuConfig config = menus.get(menuName);
         if (config == null) {
             player.sendMessage("菜单配置不存在");
             return;
         }
 
-        // 对于 veteran 和 shop 菜单，需要根据当前页码选择正确的布局
-        if (menuKey.equals("veteran") || menuKey.equals("shop")) {
-            MenuSession existingSession = MenuSessionManager.getInstance().getSession(player);
-            int page = existingSession != null ? existingSession.getPage() : 0;
-            
-            // 选择使用哪个形状（根据页码）
-            List<String> currentShape = page == 0 ? config.shape : (config.shape2 != null && !config.shape2.isEmpty() ? config.shape2 : config.shape);
-            
-            // 根据当前形状创建正确大小的库存
-            Map<Integer, String> slotActions = buildSlotActions(config, currentShape);
-            Inventory inventory = Bukkit.createInventory(new MenuHolder(config.title), currentShape.size() * 9, ConfigManager.colorize(config.title));
-            
-            // 创建或更新菜单会话，保持现有的页码
-            MenuSession session = existingSession != null ? existingSession : new MenuSession(player, menuKey, config, slotActions);
-            MenuSessionManager.getInstance().createSession(player, menuKey, session);
-            
-            if (menuKey.equals("veteran")) {
-                createVeteranInventory(player, config, inventory, slotActions);
-            } else if (menuKey.equals("shop")) {
-                createShopInventory(player, config, inventory, slotActions);
-            }
-        } else {
-            // 其他菜单使用默认形状
-            Map<Integer, String> slotActions = buildSlotActions(config);
-            Inventory inventory = Bukkit.createInventory(new MenuHolder(config.title), config.shape.size() * 9, ConfigManager.colorize(config.title));
-            
-            // 创建或更新菜单会话
-            MenuSessionManager.getInstance().createSession(player, menuKey, new MenuSession(player, menuKey, config, slotActions));
+        // 获取现有 session（如果有）
+        MenuSession existingSession = MenuSessionManager.getInstance().getSession(player);
+        
+        // 对于 veteran 和 shop 菜单，尝试保持页码，但只有在菜单类型相同时才复用 page
+        int page = 0;
+        if ((menuKey.equals("veteran") || menuKey.equals("shop")) && 
+            existingSession != null && existingSession.getMenuType().equals(menuKey)) {
+            page = existingSession.getPage();
+            plugin.getLogger().info("[DEBUG] Reusing page: " + page + " for same menu type");
+        }
 
-            switch (menuKey) {
-                case "main" -> createMainMenuInventoryAsync(player, inventory, config, slotActions);
-            }
+        // 选择使用哪个形状（根据页码）
+        List<String> currentShape;
+        if (menuKey.equals("veteran") || menuKey.equals("shop")) {
+            currentShape = page == 0 ? config.shape : (config.shape2 != null && !config.shape2.isEmpty() ? config.shape2 : config.shape);
+        } else {
+            currentShape = config.shape;
+        }
+        
+        // 根据当前形状创建正确大小的库存
+        Map<Integer, String> slotActions = buildSlotActions(config, currentShape);
+        int menuSize = currentShape.size() * 9;
+        Inventory inventory = Bukkit.createInventory(new MenuHolder(config.title), menuSize, ConfigManager.colorize(config.title));
+        
+        // 总是创建新的菜单会话（确保 slotActions 是正确的）
+        MenuSession session = new MenuSession(player, menuKey, config, slotActions, menuSize);
+        session.setPage(page); // 设置页码
+        MenuSessionManager.getInstance().createSession(player, menuKey, session);
+        plugin.getLogger().info("[DEBUG] Created new session with " + slotActions.size() + " slot actions");
+        
+        if (menuKey.equals("veteran")) {
+            createVeteranInventory(player, config, inventory, slotActions);
+        } else if (menuKey.equals("shop")) {
+            createShopInventory(player, config, inventory, slotActions);
+        } else if (menuKey.equals("main")) {
+            createMainMenuInventoryAsync(player, inventory, config, slotActions);
         }
     }
 
@@ -168,6 +174,7 @@ public class MenuManager {
     }
 
     private void createMainMenuInventoryAsync(Player player, Inventory inventory, MenuConfig config, Map<Integer, String> slotActions) {
+        plugin.getLogger().info("[DEBUG] createMainMenuInventoryAsync called for player: " + player.getName());
         String veteranPerm = plugin.getConfigManager().getConfig()
             .getString("invite_code.veteran_permission", "alinvite.veteran");
         boolean hasPermission = player.hasPermission(veteranPerm);
@@ -226,9 +233,9 @@ public class MenuManager {
                 slot++;
             }
         }
+        
         SchedulerUtils.runTask(plugin, () -> {
             player.openInventory(inventory);
-            MenuSessionManager.getInstance().createSession(player, "main", new MenuSession(player, "main", config, slotActions));
         });
     }
 
@@ -306,6 +313,9 @@ public class MenuManager {
     }
 
     private void createVeteranInventory(Player player, MenuConfig config, Inventory inventory, Map<Integer, String> slotActions) {
+        // 创建新的 slotActions 确保不会修改传入的原始 map
+        Map<Integer, String> localSlotActions = new HashMap<>(slotActions);
+        
         plugin.getDatabaseManager().getClaimedMilestones(player.getUniqueId()).thenAccept(claimedJson -> {
             Set<String> claimed = parseJsonArray(claimedJson);
             plugin.getDatabaseManager().getPlayerData(player.getUniqueId()).thenAccept(data -> {
@@ -349,13 +359,6 @@ public class MenuManager {
                     int totalPages = (int) Math.ceil((double) milestoneList.size() / milestonesPerPage);
                     // 确保总页数至少为1
                     totalPages = Math.max(totalPages, 1);
-
-                    // 清空之前的里程碑物品
-                    for (int i = 0; i < inventory.getSize(); i++) {
-                        if (slotActions.get(i) != null && slotActions.get(i).equals("CLAIM_MILESTONE")) {
-                            inventory.setItem(i, null);
-                        }
-                    }
 
                     // 放置里程碑物品
                     for (int i = 0; i < currentPageMilestones.size(); i++) {
@@ -445,7 +448,7 @@ public class MenuManager {
                         if (milestoneSlot < inventory.getSize()) {
                             inventory.setItem(milestoneSlot, item);
                         }
-                        slotActions.put(milestoneSlot, "CLAIM_MILESTONE");
+                        localSlotActions.put(milestoneSlot, "CLAIM_MILESTONE");
                     }
 
                     int layoutSlot = 0;
@@ -459,10 +462,11 @@ public class MenuManager {
                                 ButtonConfig closeBtn = config.buttons.get("C");
                                 if (closeBtn != null) {
                                     inventory.setItem(layoutSlot, createButtonItem(player, closeBtn));
+                                    localSlotActions.put(layoutSlot, "CLOSE");
                                 }
                             } else if (c == 'G') {
                                 inventory.setItem(layoutSlot, createGiftPreviewItem(player, config, currentGift));
-                                slotActions.put(layoutSlot, "OPEN_SHOP");
+                                localSlotActions.put(layoutSlot, "OPEN_SHOP");
                             } else if (c == 'P') { // 上一页按钮
                                 ButtonConfig prevBtn = config.buttons.get("P");
                                 if (prevBtn != null) {
@@ -485,6 +489,7 @@ public class MenuManager {
                                         item.setItemMeta(meta);
                                     }
                                     inventory.setItem(layoutSlot, item);
+                                    localSlotActions.put(layoutSlot, "PREV_PAGE");
                                 }
                             } else if (c == 'N') { // 下一页按钮
                                 ButtonConfig nextBtn = config.buttons.get("N");
@@ -508,6 +513,19 @@ public class MenuManager {
                                         item.setItemMeta(meta);
                                     }
                                     inventory.setItem(layoutSlot, item);
+                                    localSlotActions.put(layoutSlot, "NEXT_PAGE");
+                                }
+                            } else if (c == 'B') {
+                                ButtonConfig btn = config.buttons.get("B");
+                                if (btn != null) {
+                                    inventory.setItem(layoutSlot, createButtonItem(player, btn));
+                                    localSlotActions.put(layoutSlot, "OPEN_SHOP");
+                                }
+                            } else if (c == 'A') {
+                                ButtonConfig btn = config.buttons.get("A");
+                                if (btn != null) {
+                                    inventory.setItem(layoutSlot, createButtonItem(player, btn));
+                                    localSlotActions.put(layoutSlot, "OPEN_MAIN");
                                 }
                             } else if (c != 'M') {
                                 ButtonConfig btn = config.buttons.get(String.valueOf(c));
@@ -520,13 +538,18 @@ public class MenuManager {
                     }
 
                     final Inventory inv = inventory;
-                    final Map<Integer, String> finalSlotActions = slotActions;
+                    final Map<Integer, String> finalSlotActions = localSlotActions;
                     final int finalPage = page;
+                    
+                    // 更新现有的 session
+                    MenuSession existingSession = MenuSessionManager.getInstance().getSession(player);
+                    if (existingSession != null) {
+                        existingSession.updateSlotActions(finalSlotActions);
+                        existingSession.setPage(finalPage);
+                    }
+                    
                     SchedulerUtils.runTask(plugin, () -> {
                         player.openInventory(inv);
-                        MenuSession newSession = new MenuSession(player, "veteran", config, finalSlotActions);
-                        newSession.setPage(finalPage);
-                        MenuSessionManager.getInstance().createSession(player, "veteran", newSession);
                     });
                 });
             });
@@ -683,6 +706,9 @@ public class MenuManager {
     }
 
     private void createShopInventory(Player player, MenuConfig config, Inventory inventory, Map<Integer, String> slotActions) {
+        // 创建新的 slotActions
+        Map<Integer, String> localSlotActions = new HashMap<>(slotActions);
+        
         plugin.getDatabaseManager().getPurchasedGifts(player.getUniqueId()).thenAccept(purchasedGifts -> {
             plugin.getDatabaseManager().getGiftId(player.getUniqueId()).thenAccept(currentGiftId -> {
                 Map<String, GiftManager.GiftConfig> gifts = plugin.getGiftManager().getAllGifts();
@@ -717,13 +743,6 @@ public class MenuManager {
                 int totalPages = (int) Math.ceil((double) giftList.size() / giftsPerPage);
                 // 确保总页数至少为1
                 totalPages = Math.max(totalPages, 1);
-
-                // 清空之前的礼包物品
-                for (int i = 0; i < inventory.getSize(); i++) {
-                    if (slotActions.get(i) != null && slotActions.get(i).equals("BUY_GIFT")) {
-                        inventory.setItem(i, null);
-                    }
-                }
 
                 // 放置礼包物品
                 for (int i = 0; i < currentPageGifts.size(); i++) {
@@ -818,7 +837,7 @@ public class MenuManager {
                     if (giftSlot < inventory.getSize()) {
                         inventory.setItem(giftSlot, item);
                     }
-                    slotActions.put(giftSlot, "BUY_GIFT");
+                    localSlotActions.put(giftSlot, "BUY_GIFT");
                 }
 
                 int layoutSlot = 0;
@@ -832,16 +851,19 @@ public class MenuManager {
                             ButtonConfig closeBtn = config.buttons.get("C");
                             if (closeBtn != null) {
                                 inventory.setItem(layoutSlot, createButtonItem(player, closeBtn));
+                                localSlotActions.put(layoutSlot, "CLOSE");
                             }
                         } else if (c == 'A') {
                             ButtonConfig mainBtn = config.buttons.get("A");
                             if (mainBtn != null) {
                                 inventory.setItem(layoutSlot, createButtonItem(player, mainBtn));
+                                localSlotActions.put(layoutSlot, "OPEN_MAIN");
                             }
                         } else if (c == 'R') {
                             ButtonConfig backBtn = config.buttons.get("R");
                             if (backBtn != null) {
                                 inventory.setItem(layoutSlot, createButtonItem(player, backBtn));
+                                localSlotActions.put(layoutSlot, "BACK_TO_VETERAN");
                             }
                         } else if (c == 'P') { // 上一页按钮
                             ButtonConfig prevBtn = config.buttons.get("P");
@@ -865,6 +887,7 @@ public class MenuManager {
                                     item.setItemMeta(meta);
                                 }
                                 inventory.setItem(layoutSlot, item);
+                                localSlotActions.put(layoutSlot, "PREV_PAGE");
                             }
                         } else if (c == 'N') { // 下一页按钮
                             ButtonConfig nextBtn = config.buttons.get("N");
@@ -888,6 +911,7 @@ public class MenuManager {
                                     item.setItemMeta(meta);
                                 }
                                 inventory.setItem(layoutSlot, item);
+                                localSlotActions.put(layoutSlot, "NEXT_PAGE");
                             }
                         } else if (c != 'G') {
                             ButtonConfig btn = config.buttons.get(String.valueOf(c));
@@ -900,13 +924,18 @@ public class MenuManager {
                 }
 
                 final Inventory inv = inventory;
-                final Map<Integer, String> finalSlotActions = slotActions;
+                final Map<Integer, String> finalSlotActions = localSlotActions;
                 final int finalPage = page;
+                
+                // 更新现有的 session
+                MenuSession existingSession = MenuSessionManager.getInstance().getSession(player);
+                if (existingSession != null) {
+                    existingSession.updateSlotActions(finalSlotActions);
+                    existingSession.setPage(finalPage);
+                }
+                
                 SchedulerUtils.runTask(plugin, () -> {
                     player.openInventory(inv);
-                    MenuSession newSession = new MenuSession(player, "shop", config, finalSlotActions);
-                    newSession.setPage(finalPage);
-                    MenuSessionManager.getInstance().createSession(player, "shop", newSession);
                 });
             });
         });
@@ -1051,22 +1080,5 @@ public class MenuManager {
         public boolean isDynamic;
         public Map<String, ButtonConfig> stateOverrides;
         public int customModelData;
-    }
-
-    public static class MenuHolder implements InventoryHolder {
-        private final String title;
-
-        public MenuHolder(String title) {
-            this.title = title;
-        }
-
-        @Override
-        public Inventory getInventory() {
-            return null;
-        }
-
-        public String getTitle() {
-            return title;
-        }
     }
 }

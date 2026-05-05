@@ -4,6 +4,7 @@ import com.alinvite.commands.CommandHandler;
 import com.alinvite.config.ConfigManager;
 import com.alinvite.database.DatabaseManager;
 import com.alinvite.gui.MenuManager;
+import com.alinvite.gui.MenuSessionManager;
 import com.alinvite.listeners.InviteListener;
 import com.alinvite.listeners.LuckPermsListener;
 import com.alinvite.listeners.MenuListener;
@@ -192,6 +193,8 @@ public class ALInvite extends JavaPlugin {
         menuManager = new MenuManager(this);
         pointsRebateManager = new PointsRebateManager(this);
         leaderboardManager = new LeaderboardManager(this);
+        // 设置 MenuSessionManager 的 plugin 引用用于调试
+        MenuSessionManager.getInstance().setPlugin(this);
     }
 
     private void initCommands() {
@@ -247,10 +250,15 @@ public class ALInvite extends JavaPlugin {
     }
 
     public void reload() {
-        databaseManager.close();
-        configManager.loadAll();
-        initDatabase();
-        initManagers();
+        try {
+            databaseManager.close();
+            configManager.loadAll();
+            initDatabase();
+            initManagers();
+        } catch (Exception e) {
+            getLogger().severe("Reload failed: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     public ConfigManager getConfigManager() {

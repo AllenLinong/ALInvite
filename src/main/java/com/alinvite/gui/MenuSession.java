@@ -13,14 +13,16 @@ public class MenuSession {
     private final Player player;
     private final MenuManager.MenuConfig menuConfig;
     private final Map<Integer, String> slotActions;
+    private final int menuSize;
     private int page; // 当前页码
 
-    public MenuSession(Player player, String menuType, MenuManager.MenuConfig menuConfig, Map<Integer, String> slotActions) {
+    public MenuSession(Player player, String menuType, MenuManager.MenuConfig menuConfig, Map<Integer, String> slotActions, int menuSize) {
         this.playerId = player.getUniqueId();
         this.player = player;
         this.menuType = menuType;
         this.menuConfig = menuConfig;
         this.slotActions = slotActions;
+        this.menuSize = menuSize;
         this.page = 0; // 默认为第0页
     }
 
@@ -49,14 +51,7 @@ public class MenuSession {
     }
 
     public boolean isValid() {
-        if (player == null || !player.isOnline()) {
-            return false;
-        }
-        try {
-            return player.getOpenInventory() != null && player.getOpenInventory().getTopInventory() != null;
-        } catch (Throwable t) {
-            return false;
-        }
+        return player != null && player.isOnline();
     }
 
     public void close() {
@@ -65,9 +60,18 @@ public class MenuSession {
     public int getPage() {
         return page;
     }
+    
+    public int getMenuSize() {
+        return menuSize;
+    }
 
     public void setPage(int page) {
         this.page = page;
+    }
+
+    public void updateSlotActions(Map<Integer, String> newSlotActions) {
+        this.slotActions.clear();
+        this.slotActions.putAll(newSlotActions);
     }
 
     public void nextPage() {

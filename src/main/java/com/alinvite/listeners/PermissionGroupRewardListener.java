@@ -152,20 +152,47 @@ public class PermissionGroupRewardListener implements Listener {
         Player inviter = Bukkit.getPlayer(inviterUuid);
 
         if (money > 0) {
-            Economy economy = plugin.getServer().getServicesManager()
-                .getRegistration(Economy.class).getProvider();
-            if (economy != null) {
-                if (inviter != null) {
-                    SchedulerUtils.runTask(plugin, () -> {
-                        economy.depositPlayer(inviter, money);
+            boolean vaultAvailable = false;
+            try {
+                var registration = plugin.getServer().getServicesManager().getRegistration(Economy.class);
+                if (registration != null) {
+                    Economy economy = registration.getProvider();
+                    if (economy != null) {
+                        vaultAvailable = true;
+                        if (inviter != null) {
+                            SchedulerUtils.runTask(plugin, () -> {
+                                economy.depositPlayer(inviter, money);
+                                String msg = plugin.getConfigManager().getMessage("permission_group_reward.money")
+                                    .replace("{player}", newPlayerName)
+                                    .replace("{group}", group)
+                                    .replace("{money}", String.valueOf(money));
+                                inviter.sendMessage(msg);
+                            });
+                        } else {
+                            giveOfflineMoney(inviterUuid, money, newPlayerName, group);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                vaultAvailable = false;
+            }
+
+            if (!vaultAvailable) {
+                String moneyCommand = plugin.getConfigManager().getConfig()
+                    .getString("economy.money_command.give", "");
+                if (!moneyCommand.isEmpty()) {
+                    String targetName = inviter != null ? inviter.getName() : inviterUuid.toString();
+                    String cmd = moneyCommand
+                        .replace("%player%", targetName)
+                        .replace("%amount%", String.valueOf((int) money));
+                    Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), cmd);
+                    if (inviter != null) {
                         String msg = plugin.getConfigManager().getMessage("permission_group_reward.money")
                             .replace("{player}", newPlayerName)
                             .replace("{group}", group)
                             .replace("{money}", String.valueOf(money));
                         inviter.sendMessage(msg);
-                    });
-                } else {
-                    giveOfflineMoney(inviterUuid, money, newPlayerName, group);
+                    }
                 }
             }
         }

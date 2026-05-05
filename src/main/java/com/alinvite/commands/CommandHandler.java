@@ -186,15 +186,7 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
         }
 
         if (args.length < 2) {
-            sender.sendMessage("&6===== ALInvite 管理指令 ======");
-            sender.sendMessage("&e/alinvite admin help &7- 显示帮助信息");
-            sender.sendMessage("&e/alinvite admin reload &7- 重载插件配置");
-            sender.sendMessage("&e/alinvite admin givecode <玩家> &7- 生成邀请码");
-            sender.sendMessage("&e/alinvite admin clearcode <玩家> &7- 清除玩家邀请码");
-            sender.sendMessage("&e/alinvite admin addinvite <玩家> <数量> &7- 增加邀请次数");
-            sender.sendMessage("&e/alinvite admin reset <玩家> &7- 重置玩家邀请数据");
-            sender.sendMessage("&e/alinvite admin announce &7- 发送全服公告");
-            sender.sendMessage("&6===========================");
+            sender.sendMessage(plugin.getConfigManager().getMessageRaw("commands.admin.help"));
             return;
         }
 
@@ -571,18 +563,7 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
                 });
             }
             default -> {
-                sender.sendMessage("&6===== ALInvite 管理指令 ======");
-                sender.sendMessage("&e/alinvite admin help &7- 显示帮助信息");
-                sender.sendMessage("&e/alinvite admin reload &7- 重载插件配置");
-                sender.sendMessage("&e/alinvite admin givecode <玩家> &7- 生成邀请码");
-                sender.sendMessage("&e/alinvite admin clearcode <玩家> &7- 清除玩家邀请码");
-                sender.sendMessage("&e/alinvite admin addinvite <玩家> <数量> &7- 增加邀请次数");
-                sender.sendMessage("&e/alinvite admin reset <玩家> &7- 重置玩家邀请数据");
-                sender.sendMessage("&e/alinvite admin announce <玩家> <里程碑值> &7- 发送全服公告");
-                sender.sendMessage("&e/alinvite admin checkgroup <玩家> &7- 检查权限组奖励");
-                sender.sendMessage("&e/alinvite admin contrib <玩家> &7- 查看贡献返点");
-                sender.sendMessage("&e/alinvite admin contrib <玩家> h <金额> &7- 兑换贡献返点");
-                sender.sendMessage("&6===========================");
+                sender.sendMessage(plugin.getConfigManager().getMessageRaw("commands.admin.help"));
             }
         }
     }
@@ -610,7 +591,7 @@ public class CommandHandler implements CommandExecutor, TabCompleter {
         List<String> completions = new ArrayList<>();
 
         if (args.length == 1) {
-            completions.addAll(Arrays.asList("code", "stats", "buygift", "help", "admin", "givedj"));
+            completions.addAll(Arrays.asList("code", "stats", "buygift", "help", "admin", "givedj", "bind"));
             return filterByInput(completions, args[0]);
         }
 

@@ -563,7 +563,7 @@ public class MenuManager {
         List<String> lore = btn != null && btn.lore != null ? btn.lore : new java.util.ArrayList<>();
 
         String giftName = gift != null ? gift.name : "无";
-        List<String> giftLoreList = formatGiftConfigLore(gift);
+        List<String> giftLoreList = formatGiftConfigLore(gift, player);
         String giftLore = String.join("\n", giftLoreList);
 
         name = placeholderResolver.applyPlaceholders(name.replace("{gift_name}", giftName), player);
@@ -653,12 +653,14 @@ public class MenuManager {
         return item;
     }
 
-    private List<String> formatGiftConfigLore(GiftManager.GiftConfig gift) {
+    private List<String> formatGiftConfigLore(GiftManager.GiftConfig gift, Player player) {
         if (gift == null) {
             return List.of("&c无");
         }
         if (gift.lore != null && !gift.lore.isEmpty()) {
-            return new ArrayList<>(gift.lore);
+            return gift.lore.stream()
+                .map(line -> placeholderResolver.applyPlaceholders(line, player))
+                .toList();
         }
         return formatGiftRewardsLore(gift);
     }
@@ -782,7 +784,7 @@ public class MenuManager {
 
                     name = placeholderResolver.applyPlaceholders(name.replace("{name}", gift.name), player);
 
-                    List<String> rewardLore = formatGiftConfigLore(gift);
+                    List<String> rewardLore = formatGiftConfigLore(gift, player);
                     String durationText = gift.durationDays == 0 ? "永久" : gift.durationDays + "天";
                     List<String> finalLore = new ArrayList<>();
                     for (String line : lore) {

@@ -172,6 +172,11 @@ public class PlaceholderResolver {
             result = result.replace(entry.getKey(), entry.getValue());
         }
 
+        // 调用 PlaceholderAPI 处理第三方变量
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            result = me.clip.placeholderapi.PlaceholderAPI.setPlaceholders(player, result);
+        }
+
         return result;
     }
 

@@ -326,6 +326,10 @@ public class InviteManager {
         }
     }
 
+    public void startBindCodeInput(Player player) {
+        player.sendMessage(plugin.getConfigManager().getMessage("bind.enter_code"));
+    }
+
     /**
      * 检测同IP绑定顺序并设置功能权限
      */

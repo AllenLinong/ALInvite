@@ -204,6 +204,83 @@ public class GiftManager {
         return gifts;
     }
 
+    public void handleSlotPurchase(Player player, int slot) {
+        com.alinvite.gui.MenuSession session = com.alinvite.gui.MenuSessionManager.getInstance().getSession(player);
+        if (session == null) {
+            return;
+        }
+
+        List<String> shape = plugin.getConfigManager().getMenusConfig().getStringList("shop_menu.shape");
+        List<String> shape2 = plugin.getConfigManager().getMenusConfig().getStringList("shop_menu.shape2");
+        
+        int page = session.getPage();
+        List<String> currentShape = page == 0 ? shape : (shape2 != null && !shape2.isEmpty() ? shape2 : shape);
+
+        List<Integer> giftSlots = new ArrayList<>();
+        int shapeSlot = 0;
+        for (String row : currentShape) {
+            for (char c : row.toCharArray()) {
+                if (c == 'G') {
+                    giftSlots.add(shapeSlot);
+                }
+                shapeSlot++;
+            }
+        }
+
+        int giftIndex = giftSlots.indexOf(slot);
+        if (giftIndex == -1) {
+            return;
+        }
+
+        int giftsPerPage = giftSlots.size();
+        List<GiftConfig> giftList = new ArrayList<>(gifts.values());
+        int absoluteIndex = page * giftsPerPage + giftIndex;
+
+        if (absoluteIndex >= giftList.size()) {
+            return;
+        }
+
+        GiftConfig gift = giftList.get(absoluteIndex);
+        
+        plugin.getDatabaseManager().getGiftId(player.getUniqueId()).thenAccept(currentGiftId -> {
+            if (gift.id.equals(currentGiftId)) {
+                player.sendMessage(plugin.getConfigManager().getMessage("commands.buygift.already_active")
+                    .replace("{gift_name}", com.alinvite.config.ConfigManager.colorize(gift.name)));
+                return;
+            }
+
+            plugin.getDatabaseManager().getPurchasedGifts(player.getUniqueId()).thenAccept(purchasedGifts -> {
+                boolean isPurchased = purchasedGifts.contains(gift.id);
+                if (isPurchased) {
+                    plugin.getGiftManager().switchGift(player, gift.id).thenAccept(v -> {
+                        player.sendMessage(plugin.getConfigManager().getMessage("commands.buygift.switch_success")
+                            .replace("{gift_name}", com.alinvite.config.ConfigManager.colorize(gift.name)));
+                        plugin.getMenuManager().openShopMenu(player);
+                    });
+                } else {
+                    buyGift(player, gift.id).thenAccept(result -> {
+                        if (result.success) {
+                            player.sendMessage(plugin.getConfigManager().getMessage("commands.buygift.success")
+                                .replace("{gift_name}", com.alinvite.config.ConfigManager.colorize(gift.name)));
+                            plugin.getMenuManager().openShopMenu(player);
+                        } else {
+                            String message = switch (result.type) {
+                                case INSUFFICIENT_MONEY -> plugin.getConfigManager()
+                                    .getMessage("commands.buygift.fail_money").replace("{price}", String.valueOf(gift.priceMoney));
+                                case INSUFFICIENT_POINTS -> plugin.getConfigManager()
+                                    .getMessage("commands.buygift.fail_points").replace("{price}", String.valueOf(gift.pricePoints));
+                                case NOT_FOUND -> "&c礼包不存在！";
+                                case NO_PERMISSION -> plugin.getConfigManager().getMessage("commands.buygift.no_permission");
+                                default -> "&c购买失败";
+                            };
+                            player.sendMessage(com.alinvite.config.ConfigManager.colorize(message));
+                        }
+                    });
+                }
+            });
+        });
+    }
+
     public CompletableFuture<Void> switchGift(Player player, String giftId) {
         return plugin.getDatabaseManager().setGiftId(player.getUniqueId(), giftId)
             .thenAccept(v -> {

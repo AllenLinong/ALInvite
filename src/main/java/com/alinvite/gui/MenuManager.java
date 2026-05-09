@@ -127,6 +127,9 @@ public class MenuManager {
             page = existingSession.getPage();
             if (isDebug()) plugin.getLogger().info("[DEBUG] Reusing page: " + page + " for same menu type");
         }
+        
+        // 验证页码有效性
+        page = validatePage(page, menuKey);
 
         // 选择使用哪个形状（根据页码）
         List<String> currentShape;
@@ -158,6 +161,26 @@ public class MenuManager {
     
     private boolean isDebug() {
         return plugin.getConfigManager().getConfig().getBoolean("debug", false);
+    }
+
+    private int validatePage(int page, String menuKey) {
+        int maxPage = 0;
+        if ("veteran".equals(menuKey)) {
+            int milestonesPerPage = 14;
+            int totalMilestones = plugin.getMilestoneManager().getMilestones().size();
+            maxPage = Math.max(0, (int) Math.ceil((double) totalMilestones / milestonesPerPage) - 1);
+        } else if ("shop".equals(menuKey)) {
+            int giftsPerPage = 7;
+            int totalGifts = plugin.getGiftManager().getAllGifts().size();
+            maxPage = Math.max(0, (int) Math.ceil((double) totalGifts / giftsPerPage) - 1);
+        }
+        
+        // 确保页码在有效范围内
+        int validatedPage = Math.max(0, Math.min(page, maxPage));
+        if (validatedPage != page && isDebug()) {
+            plugin.getLogger().info("[DEBUG] Page validation: " + page + " -> " + validatedPage + " (max: " + maxPage + ")");
+        }
+        return validatedPage;
     }
 
     private Map<Integer, String> buildSlotActions(MenuConfig config, List<String> shape) {

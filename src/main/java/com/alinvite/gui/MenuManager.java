@@ -97,7 +97,7 @@ public class MenuManager {
     }
 
     public void openMainMenu(Player player) {
-        plugin.getLogger().info("[DEBUG] openMainMenu called for player: " + player.getName());
+        if (isDebug()) plugin.getLogger().info("[DEBUG] openMainMenu called for player: " + player.getName());
         openMenu(player, "main_menu", "main");
     }
 
@@ -110,7 +110,7 @@ public class MenuManager {
     }
 
     private void openMenu(Player player, String menuName, String menuKey) {
-        plugin.getLogger().info("[DEBUG] openMenu called - player: " + player.getName() + ", menuName: " + menuName + ", menuKey: " + menuKey);
+        if (isDebug()) plugin.getLogger().info("[DEBUG] openMenu called - player: " + player.getName() + ", menuName: " + menuName + ", menuKey: " + menuKey);
         MenuConfig config = menus.get(menuName);
         if (config == null) {
             player.sendMessage("菜单配置不存在");
@@ -125,7 +125,7 @@ public class MenuManager {
         if ((menuKey.equals("veteran") || menuKey.equals("shop")) && 
             existingSession != null && existingSession.getMenuType().equals(menuKey)) {
             page = existingSession.getPage();
-            plugin.getLogger().info("[DEBUG] Reusing page: " + page + " for same menu type");
+            if (isDebug()) plugin.getLogger().info("[DEBUG] Reusing page: " + page + " for same menu type");
         }
 
         // 选择使用哪个形状（根据页码）
@@ -145,7 +145,7 @@ public class MenuManager {
         MenuSession session = new MenuSession(player, menuKey, config, slotActions, menuSize);
         session.setPage(page); // 设置页码
         MenuSessionManager.getInstance().createSession(player, menuKey, session);
-        plugin.getLogger().info("[DEBUG] Created new session with " + slotActions.size() + " slot actions");
+        if (isDebug()) plugin.getLogger().info("[DEBUG] Created new session with " + slotActions.size() + " slot actions");
         
         if (menuKey.equals("veteran")) {
             createVeteranInventory(player, config, inventory, slotActions);
@@ -154,6 +154,10 @@ public class MenuManager {
         } else if (menuKey.equals("main")) {
             createMainMenuInventoryAsync(player, inventory, config, slotActions);
         }
+    }
+    
+    private boolean isDebug() {
+        return plugin.getConfigManager().getConfig().getBoolean("debug", false);
     }
 
     private Map<Integer, String> buildSlotActions(MenuConfig config, List<String> shape) {
@@ -174,7 +178,7 @@ public class MenuManager {
     }
 
     private void createMainMenuInventoryAsync(Player player, Inventory inventory, MenuConfig config, Map<Integer, String> slotActions) {
-        plugin.getLogger().info("[DEBUG] createMainMenuInventoryAsync called for player: " + player.getName());
+        if (isDebug()) plugin.getLogger().info("[DEBUG] createMainMenuInventoryAsync called for player: " + player.getName());
         String veteranPerm = plugin.getConfigManager().getConfig()
             .getString("invite_code.veteran_permission", "alinvite.veteran");
         boolean hasPermission = player.hasPermission(veteranPerm);

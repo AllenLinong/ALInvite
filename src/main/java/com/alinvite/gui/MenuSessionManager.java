@@ -23,18 +23,28 @@ public class MenuSessionManager {
     }
 
     public void createSession(Player player, String menuType, MenuSession session) {
-        plugin.getLogger().info("[DEBUG] createSession called for player " + player.getName() + ", menuType: " + menuType);
-        plugin.getLogger().info("[DEBUG] Sessions map size before: " + sessions.size());
+        if (plugin != null && plugin.getConfigManager().getConfig().getBoolean("debug", false)) {
+            plugin.getLogger().info("[DEBUG] createSession called for player " + player.getName() + ", menuType: " + menuType);
+            plugin.getLogger().info("[DEBUG] Sessions map size before: " + sessions.size());
+        }
         sessions.put(player.getUniqueId(), session);
-        plugin.getLogger().info("[DEBUG] Sessions map size after: " + sessions.size());
-        plugin.getLogger().info("[DEBUG] Session stored for UUID: " + player.getUniqueId());
+        if (plugin != null && plugin.getConfigManager().getConfig().getBoolean("debug", false)) {
+            plugin.getLogger().info("[DEBUG] Sessions map size after: " + sessions.size());
+            plugin.getLogger().info("[DEBUG] Session stored for UUID: " + player.getUniqueId());
+        }
+    }
+    
+    public int getSessionCount() {
+        return sessions.size();
     }
 
     public MenuSession getSession(Player player) {
         MenuSession session = sessions.get(player.getUniqueId());
-        plugin.getLogger().info("[DEBUG] getSession for player " + player.getName() + ", session: " + (session != null ? session.getMenuType() : "null"));
-        plugin.getLogger().info("[DEBUG] Sessions map size: " + sessions.size());
-        plugin.getLogger().info("[DEBUG] Looking for UUID: " + player.getUniqueId());
+        if (plugin != null && plugin.getConfigManager().getConfig().getBoolean("debug", false)) {
+            plugin.getLogger().info("[DEBUG] getSession for player " + player.getName() + ", session: " + (session != null ? session.getMenuType() : "null"));
+            plugin.getLogger().info("[DEBUG] Sessions map size: " + sessions.size());
+            plugin.getLogger().info("[DEBUG] Looking for UUID: " + player.getUniqueId());
+        }
         return session;
     }
 

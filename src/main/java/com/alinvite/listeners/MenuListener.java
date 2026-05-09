@@ -127,15 +127,8 @@ public class MenuListener implements Listener {
 
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
-        if (!(event.getPlayer() instanceof Player player)) {
-            return;
-        }
-
-        UUID uuid = player.getUniqueId();
-        MenuSession session = MenuSessionManager.getInstance().getSession(player);
-
-        // 不要在关闭菜单时移除会话，以保持页码信息
-        // 会话会在新菜单打开时被覆盖
+        // 暂时不移除 session，让它自然过期或被新菜单覆盖
+        // 移除 session 会导致菜单按钮点击时找不到 session
     }
 
     private boolean isDebug() {

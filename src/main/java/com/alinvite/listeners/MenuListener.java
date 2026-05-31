@@ -281,28 +281,31 @@ public class MenuListener implements Listener {
                     } else {
                         SchedulerUtils.runTask(plugin, () -> {
                             plugin.getMilestoneManager().giveRewards(player, milestone);
-                            plugin.getDatabaseManager().claimMilestone(player.getUniqueId(), String.valueOf(required)).join();
-                            player.sendMessage(plugin.getConfigManager().getMessage("milestone.claim_success")
-                                .replace("{name}", milestone.name));
-                            
-                            if (plugin.getConfigManager().getConfig().getBoolean("announcements.enabled", true)) {
-                                boolean sendOnlyOnce = plugin.getConfigManager().getConfig().getBoolean("announcements.send_only_once", true);
-                                if (sendOnlyOnce) {
-                                    plugin.getDatabaseManager().getAnnouncedMilestones(player.getUniqueId()).thenAccept(announced -> {
-                                        if (!announced.contains(String.valueOf(required))) {
+                            plugin.getDatabaseManager().claimMilestone(player.getUniqueId(), String.valueOf(required)).thenAccept(v -> {
+                                SchedulerUtils.runTask(plugin, () -> {
+                                    player.sendMessage(plugin.getConfigManager().getMessage("milestone.claim_success")
+                                        .replace("{name}", milestone.name));
+
+                                    if (plugin.getConfigManager().getConfig().getBoolean("announcements.enabled", true)) {
+                                        boolean sendOnlyOnce = plugin.getConfigManager().getConfig().getBoolean("announcements.send_only_once", true);
+                                        if (sendOnlyOnce) {
+                                            plugin.getDatabaseManager().getAnnouncedMilestones(player.getUniqueId()).thenAccept(announced -> {
+                                                if (!announced.contains(String.valueOf(required))) {
+                                                    plugin.getMilestoneManager().sendAnnouncement(player, milestone, total);
+                                                    plugin.getDatabaseManager().addAnnouncedMilestone(player.getUniqueId(), String.valueOf(required));
+                                                }
+                                            });
+                                        } else {
                                             plugin.getMilestoneManager().sendAnnouncement(player, milestone, total);
-                                            plugin.getDatabaseManager().addAnnouncedMilestone(player.getUniqueId(), String.valueOf(required));
                                         }
-                                    });
-                                } else {
-                                    plugin.getMilestoneManager().sendAnnouncement(player, milestone, total);
-                                }
-                            }
-                            
-                            player.closeInventory();
-                            SchedulerUtils.runTaskLater(plugin, () -> {
-                                plugin.getMenuManager().openVeteranMenu(player);
-                            }, 1L);
+                                    }
+
+                                    player.closeInventory();
+                                    SchedulerUtils.runTaskLater(plugin, () -> {
+                                        plugin.getMenuManager().openVeteranMenu(player);
+                                    }, 1L);
+                                });
+                            });
                         });
                     }
                 } else {

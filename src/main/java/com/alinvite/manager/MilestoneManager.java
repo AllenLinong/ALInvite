@@ -260,23 +260,26 @@ public class MilestoneManager {
 
         String mode = plugin.getConfigManager().getConfig().getString("announcements.mode", "BROADCAST");
         switch (mode.toUpperCase()) {
-            case "WORLD" -> scheduler().runAtPlayer(player, () -> {
-                String personalized = ConfigManager.colorize(template, player);
+            case "WORLD" -> {
+                // 目标玩家可能不在发起者的区域线程，逐个切实体线程渲染+发送（Folia 约束）
                 for (Player onlinePlayer : player.getWorld().getPlayers()) {
-                    onlinePlayer.sendMessage(ConfigManager.colorize(personalized, onlinePlayer));
+                    scheduler().runAtPlayer(onlinePlayer, () ->
+                        onlinePlayer.sendMessage(ConfigManager.colorize(template, onlinePlayer)));
                 }
-            });
+            }
             case "CONSOLE" -> plugin.getLogger().info(ConfigManager.colorize(template));
-            default -> scheduler().runGlobal(() -> {
+            default -> {
+                // 全服广播：逐玩家切实体线程渲染+发送，不在线程内直接操作其他玩家
                 for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
-                    onlinePlayer.sendMessage(ConfigManager.colorize(template, onlinePlayer));
+                    scheduler().runAtPlayer(onlinePlayer, () ->
+                        onlinePlayer.sendMessage(ConfigManager.colorize(template, onlinePlayer)));
                 }
                 // 跨服广播：受 announcements.cross_server_sync 开关控制，同步到集群内其它服务器
                 if (plugin.getSync() != null
                         && plugin.getConfigManager().getConfig().getBoolean("announcements.cross_server_sync", true)) {
                     plugin.getSync().sendAnnouncement(template);
                 }
-            });
+            }
         }
     }
 

@@ -5,7 +5,10 @@ import com.alinvite.utils.AsyncPool;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
+import java.net.InetAddress;
 import java.security.SecureRandom;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -102,6 +105,8 @@ public class InviteManager {
         } catch (Exception e) {
             return CompletableFuture.completedFuture(new InviteResult(false, InviteResultType.UNKNOWN));
         }
+        // 同 IP 判定用的在线玩家 IP 快照必须在同步入口捕获：异步链里读取其他玩家的连接状态违反 Folia 区域线程约束
+        Map<UUID, String> onlineIps = snapshotOnlineIps();
 
         return plugin.getDatabaseManager().getIpInviteCount(inviteeIp)
             .thenCompose(currentCount -> {
@@ -136,7 +141,7 @@ public class InviteManager {
                     }
 
                     if (plugin.getConfigManager().getConfig().getBoolean("ip_restriction.prevent_self_ip", true)) {
-                        String inviterIp = getPlayerIp(inviterUuid);
+                        String inviterIp = onlineIps.get(inviterUuid);
                         if (inviterIp != null && inviterIp.equals(inviteeIp)) {
                             return CompletableFuture.completedFuture(new InviteResult(false, InviteResultType.SELF_INVITE));
                         }
@@ -161,12 +166,20 @@ public class InviteManager {
             });
     }
 
-    private String getPlayerIp(UUID uuid) {
-        return Bukkit.getOnlinePlayers().stream()
-            .filter(p -> p.getUniqueId().equals(uuid))
-            .findFirst()
-            .map(p -> p.getAddress().getAddress().getHostAddress())
-            .orElse(null);
+    /** 在同步线程（事件/点击）捕获在线玩家 IP 快照（uuid -> ip），供异步链做同 IP 判定。 */
+    private static Map<UUID, String> snapshotOnlineIps() {
+        Map<UUID, String> snapshot = new HashMap<>();
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            try {
+                InetAddress addr = p.getAddress() != null ? p.getAddress().getAddress() : null;
+                if (addr != null) {
+                    snapshot.put(p.getUniqueId(), addr.getHostAddress());
+                }
+            } catch (Exception ignored) {
+                // 玩家恰好断开时 getAddress 可能抛出，跳过即可
+            }
+        }
+        return snapshot;
     }
 
     private CompletableFuture<InviteResult> doAddInviteRecord(UUID inviterUuid, UUID inviteeUuid, String inviteeIp, String inviteeName) {
@@ -213,6 +226,8 @@ public class InviteManager {
         }
 
         String trimmedCode = code.trim().toUpperCase();
+        // 同 processInvite：IP 快照在同步入口捕获
+        Map<UUID, String> onlineIps = snapshotOnlineIps();
 
         return isCodeExists(trimmedCode)
             .thenCompose(codeExists -> {
@@ -252,7 +267,7 @@ public class InviteManager {
                         return CompletableFuture.completedFuture(new BindResult(false, BindResultType.SELF_INVITE));
                     }
 
-                    String inviterIp = inviterUuid != null ? getPlayerIp(inviterUuid) : null;
+                    String inviterIp = inviterUuid != null ? onlineIps.get(inviterUuid) : null;
 
                     if (plugin.getConfigManager().getConfig().getBoolean("ip_restriction.enabled", false)
                             && plugin.getConfigManager().getConfig().getBoolean("ip_restriction.prevent_self_ip", true)
